@@ -1406,7 +1406,7 @@ function parseDuit(val) {
    return Number(bersih) || 0;
 }
 
-// [UPDATE FIX] Simpan Gaji Tanpa Tanda Kutip (Lebih Aman)
+// [UPDATE FIX] Simpan Gaji Partial (Tidak Hapus Data Teman Lain)
 function simpanGajiBulanan(periode, listGaji) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetRiwayat = ss.getSheetByName('RIWAYAT_GAJI');
@@ -1414,45 +1414,46 @@ function simpanGajiBulanan(periode, listGaji) {
   const keuSheet = ss.getSheetByName('KEUANGAN');
   const kasbonSheet = ss.getSheetByName('KASBON');
   const kasbonData = kasbonSheet.getDataRange().getValues();
-  
   const waktu = new Date();
   
-  // Kita simpan POLOS saja: "2026-01" (Tanpa tanda kutip aneh-aneh)
-  const periodeClean = String(periode).trim(); 
+  const periodeClean = String(periode).trim();
 
-  // --- 1. HAPUS DATA LAMA (Agar tidak numpuk jadi Draft) ---
-  // Kita baca dulu semua data untuk mencari baris yang harus dihapus
+  // --- 1. HAPUS DATA LAMA (HANYA UNTUK KARYAWAN YANG SEDANG DIPROSES) ---
+  // Agar tidak duplikat, tapi JANGAN hapus punya teman yang sudah lunas sebelumnya.
   const dataLama = sheetRiwayat.getDataRange().getDisplayValues();
   
-  // Loop dari bawah ke atas (wajib mundur kalau mau hapus row)
+  // Kita kumpulkan nama karyawan yang sedang diproses saat ini
+  const namaYangDiproses = listGaji.map(x => x.nama);
+
+  // Loop mundur untuk menghapus data lama milik karyawan yang sedang diproses
   for (let i = dataLama.length - 1; i >= 1; i--) {
-      let nilaiCell = String(dataLama[i][1]).trim();
-      
-      // Jika cell mengandung "2026-01", HAPUS BARIS ITU!
-      // Ini akan menghapus yang ada kutipnya ('2026-01) maupun yang polos (2026-01)
-      if (nilaiCell.includes(periodeClean)) {
-          sheetRiwayat.deleteRow(i + 1); 
+      let rowPeriode = String(dataLama[i][1]).trim();
+      let rowNama = String(dataLama[i][3]).trim();
+
+      // Hapus jika: Periode Sama DAN Namanya ada di list yang sedang diproses
+      if (rowPeriode === periodeClean && namaYangDiproses.includes(rowNama)) {
+          sheetRiwayat.deleteRow(i + 1);
       }
   }
 
   // --- 2. SIMPAN DATA BARU ---
-  let totalKeluar = 0;
+  let totalKeluarSesiIni = 0;
 
   listGaji.forEach(k => {
-      // (Bagian Kasbon Baru & Potongan Kasbon biarkan sama...)
-      
+      // (Logika Kasbon Baru & Potongan Kasbon tetap sama...)
       let nominalKasbonBaru = Number(k.kasbonBaru) || 0;
       if (nominalKasbonBaru > 0) {
           kasbonSheet.appendRow(['KSB-' + Date.now(), waktu, k.nama, nominalKasbonBaru, k.ketKasbonBaru || '', 'Belum Lunas', 0, 1, nominalKasbonBaru]);
       }
 
-      let bayarBulanIni = Number(k.kasbonPotongan);
+      let bayarBulanIni = Number(k.potonganManual); // Gunakan mapping potonganManual
       if(bayarBulanIni > 0) {
           for(let i=1; i<kasbonData.length; i++) {
             if(kasbonData[i][2] == k.nama && String(kasbonData[i][5]).includes('Belum') && bayarBulanIni > 0) {
                let sisa = Number(kasbonData[i][3]) - (Number(kasbonData[i][6]) || 0);
                let alokasi = Math.min(sisa, bayarBulanIni);
                let newSudah = (Number(kasbonData[i][6]) || 0) + alokasi;
+            
                kasbonSheet.getRange(i+1, 7).setValue(newSudah);
                if(newSudah >= Number(kasbonData[i][3])) kasbonSheet.getRange(i+1, 6).setValue('Lunas');
                sheetKasbonHistory.appendRow(['AUTO-' + Date.now(), kasbonData[i][0], waktu, alokasi, 'Potong Gaji', 'Payroll ' + periode]);
@@ -1461,32 +1462,32 @@ function simpanGajiBulanan(periode, listGaji) {
           }
       }
 
-      // SIMPAN RIWAYAT (Pakai periodeClean yang tanpa kutip)
-      let totalPotongan = (Number(k.kasbonPotongan) || 0) + (Number(k.potonganLain) || 0);
-      
+      // SIMPAN RIWAYAT
+      let totalPotongan = (Number(k.potonganManual) || 0); // Sederhanakan field
       sheetRiwayat.appendRow([
           'PAY-' + Date.now(), 
-          periodeClean, // Simpan "2026-01"
+          periodeClean, 
           waktu, k.nama, k.gaji, 
           Number(k.bonus) + nominalKasbonBaru, 
           totalPotongan, k.total, 'Sukses'
       ]);
-      totalKeluar += Number(k.total);
+      totalKeluarSesiIni += Number(k.total);
   });
 
-  // --- 3. KEUANGAN ---
-  // Cek agar tidak double catat di keuangan
-  const cekKeu = keuSheet.getDataRange().getDisplayValues();
-  let sudahCatatKeu = false;
-  for(let x=1; x<cekKeu.length; x++) {
-     // Cek kolom keterangan (Index 5) apakah memuat periode ini
-     if(String(cekKeu[x][5]).includes(periodeClean)) { sudahCatatKeu = true; break; }
-  }
-  
-  if(!sudahCatatKeu) {
-     keuSheet.appendRow(['PAYROLL-' + Date.now(), waktu, 'Pengeluaran', 'Gaji Karyawan', totalKeluar, `Payroll Periode ${periodeClean}`, 'Kas Tunai (Laci)']);
+  // --- 3. KEUANGAN (CATAT PENGELUARAN TAMBAHAN) ---
+  // Catat pengeluaran hanya sebesar total yang dicairkan sesi ini
+  if(totalKeluarSesiIni > 0) {
+     keuSheet.appendRow([
+         'PAYROLL-' + Date.now(), 
+         waktu, 
+         'Pengeluaran', 
+         'Gaji Karyawan', 
+         totalKeluarSesiIni, 
+         `Payroll Partial ${periodeClean} (${listGaji.length} Org)`, 
+         'Kas Tunai (Laci)'
+     ]);
   }
   
   SpreadsheetApp.flush(); 
-  return "Gaji Periode " + periode + " BERHASIL dicairkan!";
+  return "Pencairan untuk " + listGaji.length + " karyawan berhasil disimpan!";
 }
