@@ -3470,47 +3470,63 @@ function cekDataGaji() {
     }).getRiwayatGajiByPeriode(periode);
 }
 
-// [UPDATE MAJOR] Load Preview dengan Konsep Verifikasi
-// [UPDATE FIX] Load Preview Gaji (Anti Error Null)
+// [UPDATE FIX TOMBOL] Load Preview Hanya Yang Belum Lunas & Munculkan Tombol Cairkan
 function loadPreviewHitungGaji(periode) {
     const tbody = document.getElementById('tbody-gaji');
     const btnArea = document.getElementById('btn-area-gaji');
 
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm"></div> Memuat data karyawan...</td></tr>';
+    // Tampilkan Loading
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm"></div> Memuat karyawan pending...</td></tr>';
 
     google.script.run
     .withFailureHandler(err => {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Gagal memuat data: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Gagal: ${err.message}</td></tr>`;
     })
     .withSuccessHandler(data => {
-        // [PENTING] Pengaman jika data null
         const safeData = data || []; 
 
-        if (safeData.length === 0) {
-             tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted fst-italic py-4">Tidak ada data karyawan aktif.</td></tr>';
-             btnArea.innerHTML = '';
+        // 1. FILTER: Ambil hanya yang "Belum Digaji"
+        const pendingList = safeData.filter(x => x.status === 'Belum Digaji');
+
+        if (pendingList.length === 0) {
+             tbody.innerHTML = '<tr><td colspan="7" class="text-center text-success fw-bold py-5"><i class="material-icons d-block mb-2" style="font-size:32px">check_circle</i>Semua karyawan sudah digaji untuk periode ini.</td></tr>';
+             btnArea.innerHTML = ''; // Kosongkan tombol jika tidak ada data
              return;
         }
 
-        // Mapping data ke Session
-        sessionPayrollData = safeData.map(item => ({
-            ...item,
+        // 2. MAPPING DATA KE SESSION (Agar bisa diedit)
+        sessionPayrollData = pendingList.map(item => ({
+            id: item.id,
+            nama: item.nama,
+            gaji: Number(item.gaji),
+            bonus: Number(item.bonus),
+            kasbonPotongan: Number(item.kasbon), 
+            sisaHutang: 0, 
+            total: Number(item.total),
+            
+            // Default Status Draft
             statusVerifikasi: 'Draft',
             kasbonBaru: 0,
             potonganLain: 0,
             ketKasbonBaru: ''
         })); 
-        
-        renderTabelPayroll(); // Render ulang tabel
 
-        // Tombol Cairkan (Disabled di awal)
+        // 3. [PENTING] PASANG TOMBOL "CAIRKAN" DULU SEBELUM RENDER TABEL
+        // Agar saat renderTabelPayroll() jalan, dia bisa mendeteksi tombol ini.
         btnArea.innerHTML = `
             <button id="btn-cairkan-final" class="btn btn-secondary rounded-pill fw-bold shadow px-4" onclick="prosesCairkanSemua('${periode}')" disabled>
-                <i class="material-icons align-middle">lock</i> SELESAIKAN VERIFIKASI DULU
+                <i class="material-icons align-middle">lock</i> BELUM ADA YANG VERIFIKASI
             </button>
         `;
+        
+        // 4. RENDER TABEL (Ini akan otomatis update status tombol di atas)
+        renderTabelPayroll(); 
 
-    }).getDataPayroll(); 
+        // 5. UPDATE PESAN HEADER
+        const msg = document.getElementById('status-periode-msg');
+        if(msg) msg.innerHTML = `<span class="text-warning fw-bold"><i class="material-icons align-middle">edit</i> Memproses ${pendingList.length} karyawan yang belum digaji.</span>`;
+
+    }).getRiwayatGajiByPeriode(periode); 
 }
 
 // [UPDATE RAPI] Render Tabel Payroll (Draft)
@@ -3561,17 +3577,24 @@ function renderTabelPayroll() {
         `;
     });
     
-    // Update Tombol Cairkan (Sama seperti sebelumnya...)
+    // --- BAGIAN INI YANG DIUBAH AGAR BISA PARTIAL ---
     const btnFinal = document.getElementById('btn-cairkan-final');
     if(btnFinal) {
-        if(verifiedCount === sessionPayrollData.length && verifiedCount > 0) {
+        // Logika Baru: Tombol AKTIF jika ada MINIMAL 1 yang terverifikasi (verifiedCount > 0)
+        // Tidak perlu menunggu semua (verifiedCount === sessionPayrollData.length)
+        
+        if(verifiedCount > 0) {
             btnFinal.disabled = false;
             btnFinal.className = "btn btn-success rounded-pill fw-bold shadow px-4";
-            btnFinal.innerHTML = `<i class="material-icons align-middle">payments</i> CAIRKAN SEMUA (${verifiedCount})`;
+            
+            // Teks tombol menunjukkan berapa orang yang akan dibayar
+            // Contoh: "CAIRKAN GAJI (2 Org)"
+            btnFinal.innerHTML = `<i class="material-icons align-middle">payments</i> CAIRKAN GAJI (${verifiedCount})`;
         } else {
+            // Jika belum ada satupun yang diverifikasi
             btnFinal.disabled = true;
             btnFinal.className = "btn btn-secondary rounded-pill fw-bold shadow px-4";
-            btnFinal.innerHTML = `<i class="material-icons align-middle">lock</i> VERIFIKASI ${verifiedCount}/${sessionPayrollData.length}`;
+            btnFinal.innerHTML = `<i class="material-icons align-middle">lock</i> BELUM ADA YANG VERIFIKASI`;
         }
     }
 }
@@ -3691,35 +3714,31 @@ function simpanVerifikasiKaryawan() {
     renderTabelPayroll();
 }
 
-// [BARU] Proses Cairkan Final
-// [UPDATE REALTIME] Proses Cairkan dengan Auto-Refresh Dashboard
 function prosesCairkanSemua(periode) {
-    // Ambil data yang sudah diverifikasi (Sesuai)
+    // 1. Ambil HANYA yang statusnya 'Sesuai'
     const dataFinal = sessionPayrollData.filter(p => p.statusVerifikasi === 'Sesuai');
     
     if(dataFinal.length === 0) return myAlert('Error', 'Belum ada data yang diverifikasi.', 'warning');
 
-    myConfirm('Konfirmasi Pencairan', `Cairkan gaji untuk ${dataFinal.length} karyawan?\nPastikan semua nominal sudah benar.`, () => {
+    // 2. Konfirmasi jumlah orang yang akan digaji
+    myConfirm('Konfirmasi Pencairan', `Siap mencairkan gaji untuk ${dataFinal.length} karyawan yang dipilih?\n(Sisa karyawan lain bisa diproses nanti)`, () => {
         loading(true);
         google.script.run.withSuccessHandler(res => {
             loading(false);
             myAlert('Sukses', res, 'success');
             
-            // --- BAGIAN INI YANG MEMBUAT REALTIME ---
-            // Setelah sukses simpan ke database, kita paksa aplikasi
-            // untuk memuat ulang semua data penting:
+            // --- UPDATE DASHBOARD & KEUANGAN SECARA REALTIME ---
             
-            // 1. Refresh Tabel Gaji (Biar jadi Hijau/Lunas)
+            // 1. Refresh Tabel Gaji (Agar yang sudah dibayar jadi HIJAU/LUNAS)
             cekDataGaji(); 
             
-            // 2. Refresh Dashboard (Biar grafik & total pengeluaran naik)
-            // Pastikan fungsi ini ada (biasanya loadDashboard)
+            // 2. Refresh Dashboard (Agar Pengeluaran Gaji langsung mengurangi Laba)
             if(typeof loadDashboard === 'function') loadDashboard();
             
-            // 3. Refresh Keuangan (Biar tabel keuangan update)
+            // 3. Refresh Keuangan (Agar tercatat di Tabel Arus Kas)
             if(typeof loadKeuangan === 'function') loadKeuangan();
             
-            // 4. Refresh Kasbon (Siapa tahu ada potong gaji)
+            // 4. Refresh Kasbon (Update sisa hutang karyawan)
             if(typeof loadKasbon === 'function') loadKasbon();
 
         }).simpanGajiBulanan(periode, dataFinal);
