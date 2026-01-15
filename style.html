@@ -1,0 +1,561 @@
+<style>
+  :root {
+    --primary-red: #ff3b30; /* Merah Le Rouge */
+    --primary-dark: #d63031;
+    --bg-light: #f5f6fa;
+    --text-dark: #2d3436;
+    --text-muted: #636e72;
+    --sidebar-width: 260px;
+    --card-shadow: 0 5px 20px rgba(0,0,0,0.05);
+    --border-radius: 12px;
+  }
+
+  body {
+    background-color: var(--bg-light);
+    font-family: 'Poppins', sans-serif;
+    color: var(--text-dark);
+    overflow-x: hidden;
+  }
+
+/* --- SIDEBAR FIX --- */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: #fff;
+    height: 100vh;      /* Tinggi Full Layar */
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.02);
+    transition: all 0.3s;
+    
+    /* TAMBAHAN PENTING AGAR MENU TIDAK TENGGELAM */
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-header {
+    height: 70px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    background: var(--primary-red); /* Logo area merah */
+    color: white;
+  }
+
+  .nav-link {
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 12px 24px;
+    border-radius: 0 25px 25px 0; /* Lengkungan di kanan */
+    margin-right: 15px;
+    transition: all 0.2s;
+    font-size: 0.95rem;
+  }
+
+  .nav-link:hover {
+    color: var(--primary-red);
+    background: #fff0f0;
+  }
+
+  .nav-link.active {
+    color: var(--primary-red);
+    background: #fff0f0;
+    border-left: 4px solid var(--primary-red); /* Indikator aktif */
+    font-weight: 600;
+  }
+
+  .nav-link i {
+    width: 24px;
+    margin-right: 10px;
+  }
+
+  /* --- MAIN CONTENT --- */
+  .main-wrapper {
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* --- TOP HEADER --- */
+  .top-header {
+    height: 70px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+    position: sticky;
+    top: 0;
+    z-index: 99;
+  }
+
+  .user-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .user-avatar {
+    width: 35px;
+    height: 35px;
+    background: var(--primary-red);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+  }
+
+  /* --- CARDS & WIDGETS --- */
+  .content-body {
+    padding: 30px;
+  }
+
+  .card {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    background: #fff;
+    transition: transform 0.2s;
+    margin-bottom: 24px;
+  }
+  
+  .card:hover {
+    transform: translateY(-3px);
+  }
+
+  .stat-card {
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+  
+  .bg-icon-red { background: #ffeaea; color: var(--primary-red); }
+  .bg-icon-blue { background: #e7f5ff; color: #0099ff; }
+  .bg-icon-green { background: #e8fbf0; color: #00b894; }
+
+  h3.stat-value {
+    font-weight: 700;
+    font-size: 1.8rem;
+    margin: 0;
+    color: var(--text-dark);
+  }
+
+  p.stat-label {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  /* --- TABLES --- */
+  .table-custom thead th {
+    background-color: transparent;
+    border-bottom: 2px solid #eee;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .table-custom tbody td {
+    padding: 15px 10px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f1f1;
+    color: var(--text-dark);
+    font-size: 0.95rem;
+  }
+
+  /* --- BUTTONS --- */
+  .btn-primary {
+    background-color: var(--primary-red);
+    border-color: var(--primary-red);
+    box-shadow: 0 4px 10px rgba(255, 59, 48, 0.3);
+  }
+  .btn-primary:hover {
+    background-color: var(--primary-dark);
+  }
+
+  /* --- UTILS --- */
+  .page-title {
+    font-weight: 700;
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+  }
+  
+  .breadcrumb-custom {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 25px;
+  }
+
+  /* Spinner Loading */
+  .spinner-custom {
+      width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-red); border-radius: 50%; animation: spin 1s linear infinite;
+  }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+  /* Tambahkan ini di file style untuk mempercepat animasi menu */
+.collapsing {
+    transition: height 0.2s ease !important; /* Standarnya sekitar 0.35s */
+}
+
+/* TAMBAHAN POS GRID STYLE */
+.product-card {
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 1px solid #f1f1f1;
+}
+
+.product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
+  border-color: var(--primary-red);
+}
+
+.product-card:active {
+  transform: scale(0.95);
+}
+
+.product-icon {
+  width: 50px; height: 50px;
+  background: #fff0f0;
+  color: var(--primary-red);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 10px;
+}
+
+.pos-search-bar {
+  background: white;
+  border-radius: 50px;
+  padding: 8px 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.grid-scroll-area {
+  max-height: 75vh;
+  overflow-y: auto;       /* Scroll vertikal aktif */
+  overflow-x: hidden;     /* Scroll horizontal DISERMBUNYIKAN (agar rapi) */
+  padding: 10px;          /* Memberi ruang agar bayangan kartu tidak terpotong */
+}
+
+/* Styling Scrollbar Chrome/Edge/Safari */
+.grid-scroll-area::-webkit-scrollbar {
+  width: 6px;   /* Lebar untuk scroll vertikal */
+  height: 6px;  /* Tinggi untuk scroll horizontal (INI YANG BIKIN TIPIS) */
+}
+
+.grid-scroll-area::-webkit-scrollbar-track {
+  background: transparent; 
+}
+
+.grid-scroll-area::-webkit-scrollbar-thumb {
+  background-color: #d1d5db; /* Warna abu soft */
+  border-radius: 20px;       /* Membuat bentuk bulat lonjong */
+}
+
+.grid-scroll-area::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af; /* Warna saat di-hover */
+}
+
+/* --- BUTTON ANIMASI (TOMBOL +) --- */
+.btn-animate-bounce {
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Efek Membal */
+  font-weight: bold;
+  font-size: 1.2rem;
+  line-height: 0;
+  width: 45px; /* Lebar lebih luas agar mudah ditekan */
+  border-radius: 0 8px 8px 0; /* Sudut tumpul di kanan */
+}
+
+/* Saat Mouse Diarahkan (Hover) */
+.btn-animate-bounce:hover {
+  background-color: #0d6efd !important; /* Biru Utama */
+  color: white !important;
+  transform: scale(1.1); /* Membesar sedikit */
+  z-index: 10;
+  box-shadow: 0 4px 10px rgba(13, 110, 253, 0.3);
+}
+
+/* Saat Ditekan (Klik) */
+.btn-animate-bounce:active {
+  transform: scale(0.9); /* Mengecil (Efek Per/Pegas) */
+  background-color: #0a58ca !important;
+}
+
+@media print {
+      /* 1. Atur Kertas A5 Landscape & Margin Tipis */
+      @page {
+          size: A5 landscape; 
+          margin: 5mm; /* Margin diperkecil jadi 5mm agar muat banyak */
+      }
+
+      /* 2. Reset Body & Paksa Warna */
+      body {
+          margin: 0;
+          padding: 0;
+          background-color: white !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          font-family: sans-serif; /* Font lebih bersih */
+      }
+
+      /* 3. Sembunyikan elemen website lain */
+      body * {
+          visibility: hidden;
+          height: 0; /* Pastikan elemen tersembunyi tidak makan tempat */
+          overflow: hidden; 
+      }
+
+      /* 4. Tampilkan & Reset Container Invoice */
+      #modalInvoice, #modalInvoice * {
+          visibility: visible;
+          height: auto;
+          overflow: visible;
+      }
+
+      /* 5. Pengaturan Posisi Invoice agar Full Halaman */
+      #modalInvoice {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          margin: 0 !important;
+          padding: 0 !important;
+      }
+
+      .modal-dialog {
+          max-width: 100% !important;
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+      }
+
+      .modal-content {
+          border: none !important;
+          box-shadow: none !important;
+      }
+
+      /* --- BAGIAN PENGECILAN UKURAN (AGAR MUAT 1 LEMBAR) --- */
+      
+      /* Perkecil padding body invoice */
+      .modal-body {
+          padding: 10px !important; /* Aslinya p-4 (sekitar 24px), kita kecilkan */
+      }
+
+      /* Perkecil Font Dasar */
+      #area-cetak {
+          font-size: 10pt !important; /* Font standar diperkecil */
+          line-height: 1.2 !important; /* Spasi antar baris dirapatkan */
+      }
+
+      /* Perkecil Judul (PT PANJI ALAM JAYA) */
+      #area-cetak h2 {
+          font-size: 16pt !important;
+          margin-bottom: 2px !important;
+      }
+      
+      #area-cetak h4 {
+          font-size: 14pt !important;
+          margin-bottom: 2px !important;
+      }
+
+      #area-cetak h5 {
+          font-size: 11pt !important;
+          margin-bottom: 2px !important;
+      }
+
+      /* Perkecil Spasi (Margin Bottom) Bootstrap */
+      .mb-3, .mb-4 {
+          margin-bottom: 8px !important; /* Rapatkan jarak antar elemen */
+      }
+      
+      .pb-3 {
+          padding-bottom: 8px !important;
+      }
+
+      /* Tabel: Rapatkan Padding Sel */
+      .table-bordered th, 
+      .table-bordered td {
+          padding: 4px 8px !important; /* Padding sel diperkecil */
+          font-size: 10pt !important;
+      }
+
+      /* TTD (Tanda Tangan) */
+      /* Mengganti <br><br><br> manual dengan margin CSS yang terkontrol */
+      .col-4.text-center.mt-3 {
+          margin-top: 10px !important;
+      }
+      
+      /* Paksa area Tanda Tangan tidak lompat halaman */
+      .row.mt-4 {
+          page-break-inside: avoid;
+      }
+
+      /* Warna (Agar merah tetap merah) */
+      .text-danger { color: #dc3545 !important; }
+      .bg-light { background-color: #f8f9fa !important; }
+      
+      /* Sembunyikan tombol & backdrop */
+      .no-print, .modal-footer, .btn-close, .modal-backdrop {
+          display: none !important;
+      }
+  }
+
+/* Pemisah Halaman (Page Break) */
+.page-break {
+    display: block;
+    clear: both;
+    page-break-before: always; /* Paksa pindah ke halaman baru */
+    break-before: page;
+}
+
+/* Sembunyikan elemen kosong agar tidak memakan tempat */
+.empty-space {
+    height: 20px;
+}
+
+/* --- PERBAIKAN TAMPILAN INPUT NOMOR (MODAL CEK TABUNG) --- */
+  
+  /* 1. Hilangkan Panah Up/Down (Spinner) bawaan Browser */
+  /* Chrome, Safari, Edge, Opera */
+  input[type=number]::-webkit-inner-spin-button, 
+  input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+  }
+  /* Firefox */
+  input[type=number] {
+    -moz-appearance: textfield;
+  }
+
+  /* 2. Hilangkan Ikon Pentung Merah (Validasi Bootstrap) */
+  /* Agar tidak menimpa angka saat error */
+  .form-control.is-invalid {
+      background-image: none !important; /* Hapus ikon background */
+      padding-right: 0.75rem !important; /* Reset padding kanan */
+  }
+
+  /* Styling Tambahan Form Edit */
+.letter-spacing-1 {
+    letter-spacing: 1px;
+}
+.shadow-primary {
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4);
+    transition: transform 0.2s;
+}
+.shadow-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(13, 110, 253, 0.5);
+}
+/* Input background light agar borderless tapi jelas */
+.form-control.bg-light:focus {
+    background-color: #fff !important;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.1);
+    border: 1px solid #dee2e6 !important;
+}
+
+@media print {
+  /* Sembunyikan elemen dengan class no-print saat mencetak */
+  .no-print {
+      display: none !important;
+  }
+}
+
+/* --- STYLE TAB MODERNA SDM --- */
+.card-header-tabs .nav-link {
+    border: none;
+    border-bottom: 3px solid transparent; /* Garis bawah transparan default */
+    color: #6c757d; /* Warna teks default abu */
+    font-weight: 600;
+    padding: 12px 20px;
+    background: transparent !important; /* Hapus background putih/merah aneh */
+    transition: all 0.3s;
+}
+
+.card-header-tabs .nav-link:hover {
+    color: var(--primary-red);
+    border-color: transparent;
+    background: #fff5f5 !important; /* Efek hover merah muda sangat tipis */
+}
+
+.card-header-tabs .nav-link.active {
+    color: var(--primary-red) !important; /* Warna teks aktif Merah */
+    background: transparent !important;
+    border-bottom: 3px solid var(--primary-red); /* Garis bawah merah tegas */
+}
+
+/* Tabel di dalam SDM */
+#tabel-karyawan thead th, #tabel-kasbon thead th {
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+/* --- FIX MODAL TUMPUK (Z-INDEX) --- */
+/* Pastikan Global Modal (Alert/Confirm) selalu di atas modal lain */
+#globalModal {
+    z-index: 10000 !important; 
+}
+/* Backdrop (Layar gelap) untuk modal kedua juga harus di atas modal pertama */
+.modal-backdrop:nth-of-type(2) {
+    z-index: 9999 !important;
+}
+
+/* Tabel Utama */
+  .table-custom {
+      border-collapse: separate; 
+      border-spacing: 0;
+      width: 100%;
+  }
+
+  /* Header Tabel: Warna Soft Abu, Teks Tebal, Uppercase */
+  .table-custom thead th {
+      background-color: #f8f9fa; /* Abu-abu sangat muda */
+      color: #495057;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.75rem; /* Huruf kecil tapi tegas */
+      letter-spacing: 0.5px;
+      padding: 15px 10px; /* Padding Atas-Bawah Lega */
+      border-bottom: 2px solid #dee2e6;
+      vertical-align: middle;
+      white-space: nowrap; /* Teks header tidak boleh turun baris */
+  }
+
+  /* Body Tabel: Baris Lebih Tinggi */
+  .table-custom tbody td {
+      vertical-align: middle; /* Pastikan konten di tengah vertikal */
+      padding: 12px 10px; /* Jarak antar baris lebih lega */
+      border-bottom: 1px solid #edf2f7;
+      font-size: 0.9rem;
+  }
+
+  /* Hover Effect yang Halus */
+  .table-custom tbody tr:hover {
+      background-color: #f1f3f5 !important;
+  }
+  
+  /* Kolom Angka (Rata Kanan) */
+  .text-end-num {
+      text-align: right;
+      font-family: 'Consolas', 'Monaco', monospace; /* Font angka biar sejajar */
+      font-weight: 500;
+  }
+</style>
