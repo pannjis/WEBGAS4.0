@@ -892,10 +892,10 @@ function renderCharts(stats) {
     });
 
     // 3. CHART PIE (PEMASUKAN vs PENGELUARAN)
-    // Atau bisa juga Laba Bersih vs Beban
     const ctxPie = document.getElementById('chartPie').getContext('2d');
     
-    let profit = stats.pendapatanBulanIni - stats.pengeluaranBulanIni;
+    // PERBAIKAN: Gunakan nama variabel yang sesuai dengan Code.gs (stats.pendapatan & stats.pengeluaran)
+    let profit = stats.pendapatan - stats.pengeluaran; 
     if(profit < 0) profit = 0; // Biar chart ga error
 
     pieChartInstance = new Chart(ctxPie, {
@@ -903,7 +903,8 @@ function renderCharts(stats) {
         data: {
             labels: ['Pengeluaran', 'Laba Bersih'],
             datasets: [{
-                data: [stats.pengeluaranBulanIni, profit],
+                // PERBAIKAN: Gunakan stats.pengeluaran
+                data: [stats.pengeluaran, profit],
                 backgroundColor: [
                     '#dc3545', // Merah (Expense)
                     '#198754'  // Hijau (Profit)
