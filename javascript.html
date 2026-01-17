@@ -2990,7 +2990,19 @@ function switchTab(tabId, el) {
 
     if(tabId === 'karyawan') loadKaryawan();
     if(tabId === 'kasbon') loadKasbon();
+    if(tabId === 'kasbon') loadAkunKasbon();
     if(tabId === 'penggajian') initPenggajian();
+}
+
+// [BARU] Fungsi untuk mengisi dropdown akun di form kasbon
+function loadAkunKasbon() {
+    google.script.run.withSuccessHandler(data => {
+        const el = document.getElementById('kasbon-akun');
+        el.innerHTML = '<option value="">-- Pilih Akun --</option>';
+        data.forEach(a => {
+            el.innerHTML += `<option value="${a.nama}">${a.nama}</option>`;
+        });
+    }).getDaftarAkun();
 }
 
 // [UPDATE FIX] Preview Foto (Anti Error jika elemen HTML hilang)
@@ -3379,7 +3391,7 @@ function loadKaryawan() {
 
 function hapusKaryawan(id) { if(confirm('Hapus?')) google.script.run.withSuccessHandler(loadKaryawan).hapusKaryawan(id); }
 
-// 1. UPDATE FUNGSI LOAD KASBON (Tambah Tombol Detail)
+// 1. UPDATE FUNGSI LOAD KASBON (Tambah Tombol Detail & Keterangan)
 function loadKasbon() {
     const filter = document.getElementById('filter-status-kasbon').value;
     const tb = document.querySelector('#tabel-kasbon tbody');
@@ -3398,28 +3410,41 @@ function loadKasbon() {
         }
 
         filtered.forEach(r => {
-            // r[0]:ID, r[2]:Nama, r[3]:Total, r[6]:SudahBayar, r[8]:Angsuran
+            // r[0]:ID, r[1]:Tgl, r[2]:Nama, r[3]:Total, r[4]:Keterangan, r[5]:Status, r[6]:SudahBayar, r[8]:Angsuran
+            
             let tgl = new Date(r[1]).toLocaleDateString('id-ID');
             let sudahBayar = Number(r[6]) || 0;
             let sisa = Number(r[3]) - sudahBayar;
+            
             let statusBadge = r[5].includes('Belum') 
                 ? '<span class="badge bg-danger">Belum Lunas</span>' 
                 : '<span class="badge bg-success">Lunas</span>';
 
+            // [BARU] Ambil Keterangan & Pembayaran Via Apa
+            // Kita batasi panjang teks biar tabel tidak terlalu lebar
+            let ketDisplay = r[4] ? r[4] : '-';
+            if(ketDisplay.length > 35) ketDisplay = ketDisplay.substring(0, 35) + '...';
+
             tb.innerHTML += `
-                <tr>
-                    <td>${tgl}</td>
-                    <td class="fw-bold">${r[2]}</td>
+                <tr class="align-middle"> <td>${tgl}</td>
+                    <td>
+                        <div class="fw-bold">${r[2]}</div>
+                        <small class="text-muted fst-italic" style="font-size:11px; display:block; line-height:1.2;">
+                            ${ketDisplay}
+                        </small>
+                    </td>
                     <td>
                         <div class="fw-bold">${rupiah(r[3])}</div>
                         <small class="text-muted">Sisa: <span class="text-danger fw-bold">${rupiah(sisa)}</span></small>
                     </td>
                     <td>${rupiah(r[8])}<small>/bln</small></td>
                     <td>
-                        ${statusBadge}
-                        <button class="btn btn-sm btn-outline-dark rounded-pill px-3 mt-1 d-block" onclick="bukaModalBayarKasbon('${r[0]}', '${r[2]}', ${r[3]}, ${sudahBayar})">
-                            Detail / Bayar
-                        </button>
+                        <div class="d-flex flex-column align-items-center gap-1">
+                            ${statusBadge}
+                            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" onclick="bukaModalBayarKasbon('${r[0]}', '${r[2]}', ${r[3]}, ${sudahBayar})">
+                                Detail / Bayar
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -4150,32 +4175,45 @@ function hitungCicilan() {
     document.getElementById('kasbon-estimasi').value = rupiah(angsuran);
 }
 
-// [UPDATE] Simpan Kasbon (Support Ribuan)
 function simpanKasbon() {
-    // Ambil value input, buang titik
-    const rawNominal = document.getElementById('kasbon-nominal').value.replace(/\./g, '');
+    const nama = document.getElementById('kasbon-nama').value;
+    const rawNominal = document.getElementById('kasbon-nominal').value;
+    const nominal = Number(rawNominal.replace(/\./g, '')); // Hapus titik format rupiah
+    const tenor = document.getElementById('kasbon-tenor').value;
+    const ket = document.getElementById('kasbon-ket').value;
+    
+    // [BARU] Ambil nilai akun
+    const akun = document.getElementById('kasbon-akun').value;
 
-    const data = {
-        nama: document.getElementById('kasbon-nama').value,
-        nominal: rawNominal, // Kirim angka murni
-        tenor: document.getElementById('kasbon-tenor').value, 
-        ket: document.getElementById('kasbon-ket').value
+    // Validasi
+    if (!nama) return myAlert('Error', 'Pilih karyawan dulu', 'warning');
+    if (!nominal || nominal <= 0) return myAlert('Error', 'Nominal harus diisi', 'warning');
+    if (!akun) return myAlert('Penting', 'Harap pilih Akun Saldo untuk pencairan dana kasbon ini!', 'warning');
+
+    const payload = {
+        nama: nama,
+        nominal: nominal,
+        tenor: tenor,
+        ket: ket,
+        akun: akun // Kirim akun ke backend
     };
 
-    if(!data.nominal || data.nominal <= 0) return myAlert('Error', 'Nominal harus diisi', 'warning');
-
-    loading(true);
-    google.script.run.withSuccessHandler(res => {
-        loading(false);
-        myAlert('Sukses', res, 'success');
-        
-        document.getElementById('kasbon-nominal').value = '';
-        document.getElementById('kasbon-tenor').value = '1';
-        document.getElementById('kasbon-estimasi').value = 'Rp 0';
-        document.getElementById('kasbon-ket').value = '';
-        
-        loadKasbon(); 
-    }).simpanKasbon(data);
+    myConfirm('Simpan Kasbon', `Beri kasbon Rp ${rawNominal} ke ${nama}?\nSaldo ${akun} akan berkurang.`, () => {
+        loading(true);
+        google.script.run.withSuccessHandler(res => {
+            loading(false);
+            myAlert('Sukses', res, 'success');
+            
+            // Reset Form
+            document.getElementById('kasbon-nominal').value = '';
+            document.getElementById('kasbon-ket').value = '';
+            document.getElementById('kasbon-akun').value = ''; // Reset akun
+            
+            loadKasbon(); // Refresh tabel history
+            loadDashboard(); // Refresh saldo dashboard realtime
+            loadKeuangan(); 
+        }).simpanKasbon(payload);
+    });
 }
 
   function loadHitungGaji() {
