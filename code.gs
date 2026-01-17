@@ -1355,30 +1355,48 @@ function getDetailHistoryKasbon(idKasbon) {
   });
 }
 
-// 2. UPDATE: SIMPAN KASBON (Dengan Tenor)
 function simpanKasbon(form) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('KASBON');
-  
-  // Hitung Angsuran (Bulatkan ke atas biar rapi)
+  const sheetKsb = ss.getSheetByName('KASBON');
+  const sheetKeu = ss.getSheetByName('KEUANGAN');
+
+  // Hitung Angsuran
   const tenor = Number(form.tenor) || 1;
   const nominal = Number(form.nominal);
   const angsuran = Math.ceil(nominal / tenor);
+  const idKasbon = 'KSB-' + Date.now();
+  const waktu = new Date();
 
-  // Kolom: ID, Tgl, Nama, Nominal, Ket, Status, Sudah_Bayar, Tenor, Angsuran
-  sheet.appendRow([
-      'KSB-' + Date.now(), 
-      new Date(), 
+  // [PERBAIKAN DISINI]
+  // Kita gabungkan Keterangan User + Nama Akun Sumber Dana
+  const ketLengkap = `${form.ket} (Via ${form.akun})`;
+
+  // 1. Simpan data ke Sheet KASBON
+  // Perhatikan kolom ke-5 sekarang pakai 'ketLengkap'
+  sheetKsb.appendRow([
+      idKasbon, 
+      waktu, 
       form.nama, 
       nominal, 
-      form.ket, 
+      ketLengkap,     // <--- Keterangan sudah ada info akunnya
       'Belum Lunas', 
-      0,       // Sudah Bayar (Awal 0)
-      tenor,   // Tenor
-      angsuran // Angsuran per Bulan
+      0, 
+      tenor, 
+      angsuran 
   ]);
-  
-  return `Kasbon Rp ${Number(nominal).toLocaleString('id-ID')} (Cicil ${tenor}x) berhasil disimpan!`;
+
+  // 2. Catat Pengeluaran di Sheet KEUANGAN (Agar saldo akun terpotong)
+  sheetKeu.appendRow([
+      'OUT-' + idKasbon,       
+      waktu, 
+      'Pengeluaran',           
+      'Kasbon Karyawan',       
+      nominal, 
+      `Pencairan Kasbon: ${form.nama} (${form.ket})`, 
+      form.akun                
+  ]);
+
+  return "Kasbon berhasil disimpan & Saldo terpotong.";
 }
 
 // [PERBAIKAN] Ambil Data Payroll dengan Index Kolom Baru (16 Kolom)
