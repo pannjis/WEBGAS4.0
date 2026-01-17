@@ -289,21 +289,140 @@ function loginUser(username, password) {
 
 // GANTI function getDashboardStats() yang lama dengan ini:
 
-function getDashboardStats() {
-  const keu = getData('KEUANGAN');
-  let income = 0, expense = 0;
+// [CODE.GS] Update Fungsi ini
+function getDashboardRealtime(startStr, endStr) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  keu.forEach(r => {
-    // r[2] adalah Jenis, r[4] adalah Nominal
-    // Gunakan String() dan trim() agar aman dari spasi
-    let jenis = String(r[2]).trim(); 
-    let nominal = Number(r[4]);
+  // 1. TENTUKAN RANGE TANGGAL
+  let startDate, endDate;
+  const now = new Date();
+  
+  if (startStr && endStr) {
+    startDate = new Date(startStr);
+    startDate.setHours(0,0,0,0);
+    endDate = new Date(endStr);
+    endDate.setHours(23,59,59,999);
+  } else {
+    // Default: Tanggal 1 bulan ini s/d Hari ini
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  }
+  
+  // 2. SETUP DATA STRUKTUR (MAPPING CHART)
+  // Kita buat peta index tanggal agar chart sesuai urutan hari
+  let mapDateIndex = {}; 
+  let chartLabels = [];
+  let chartSales = [];
+  let chartExpense = [];
+  
+  let loopDate = new Date(startDate);
+  let idx = 0;
+  
+  // Loop dari start s/d end untuk bikin kerangka Chart
+  while(loopDate <= endDate) {
+    let key = Utilities.formatDate(loopDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    let label = Utilities.formatDate(loopDate, Session.getScriptTimeZone(), "dd/MM");
+    
+    mapDateIndex[key] = idx; // Contoh: '2026-01-01' => index 0
+    chartLabels.push(label);
+    chartSales.push(0);
+    chartExpense.push(0);
+    
+    loopDate.setDate(loopDate.getDate() + 1);
+    idx++;
+  }
 
-    if(jenis === 'Pemasukan') income += nominal;
-    if(jenis === 'Pengeluaran') expense += nominal;
+  // 3. VARIABLE STATS UTAMA
+  let stats = {
+    totalPelanggan: 0, // Nanti diisi
+    pesanan: 0,
+    pendapatan: 0,
+    pengeluaran: 0,
+    retur: 0,
+    qtyRefill: 0,
+    produkTerjual: {},
+    rataRataTransaksi: 0,
+    chartLabels: chartLabels,
+    chartSales: chartSales,
+    chartExpense: chartExpense
+  };
+
+  // 4. AMBIL DATA DARI SHEET
+  const rawTrx = getData('TRANSAKSI');
+  const rawKeu = getData('KEUANGAN');
+  const rawPel = getData('PELANGGAN');
+  const rawAkun = getDaftarAkun();
+
+  stats.totalPelanggan = rawPel.length;
+
+  // A. LOOP TRANSAKSI
+  rawTrx.forEach(row => {
+     let tgl = new Date(row[1]); // Kolom Tanggal
+     if(tgl >= startDate && tgl <= endDate) {
+         let produk = row[3];
+         let qty = Number(row[4]);
+         let total = Number(row[5]);
+         let tipe = row[6];
+         let status = row[10];
+
+         if(!String(status).includes('Retur')) {
+             stats.pesanan++;
+             stats.pendapatan += total;
+             
+             // Hitung Produk
+             if(!stats.produkTerjual[produk]) stats.produkTerjual[produk] = 0;
+             stats.produkTerjual[produk] += qty;
+
+             // Hitung Refill
+             if(tipe && tipe.toLowerCase().includes('refill')) {
+                stats.qtyRefill += qty;
+             }
+             
+             // Isi Data Chart
+             let key = Utilities.formatDate(tgl, Session.getScriptTimeZone(), "yyyy-MM-dd");
+             if (mapDateIndex.hasOwnProperty(key)) {
+                let i = mapDateIndex[key];
+                stats.chartSales[i] += total;
+             }
+         }
+     }
   });
-  
-  return { income, expense, net: income - expense };
+
+  // B. LOOP KEUANGAN
+  rawKeu.forEach(row => {
+     let tgl = new Date(row[1]);
+     if(tgl >= startDate && tgl <= endDate) {
+        let jenis = row[2];
+        let kategori = row[3];
+        let nominal = Number(row[4]);
+        let key = Utilities.formatDate(tgl, Session.getScriptTimeZone(), "yyyy-MM-dd");
+
+        if(jenis === 'Pengeluaran') {
+           stats.pengeluaran += nominal;
+           
+           if(kategori && kategori.toLowerCase().includes('retur')) {
+              stats.retur += nominal;
+           }
+
+           // Isi Data Chart
+           if (mapDateIndex.hasOwnProperty(key)) {
+              let i = mapDateIndex[key];
+              stats.chartExpense[i] += nominal;
+           }
+        }
+     }
+  });
+
+  // C. ITUNG RATA-RATA
+  if(stats.pesanan > 0) {
+     stats.rataRataTransaksi = stats.pendapatan / stats.pesanan;
+  }
+
+  return {
+     stats: stats,
+     accounts: rawAkun,
+     periode: `${Utilities.formatDate(startDate, Session.getScriptTimeZone(), "dd MMM")} - ${Utilities.formatDate(endDate, Session.getScriptTimeZone(), "dd MMM yyyy")}`
+  };
 }
 
 // [UPDATE] Fungsi Tambah Produk (Versi Debugging)
