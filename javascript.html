@@ -281,6 +281,8 @@ document.addEventListener('click', function(e) {
   }
 
 function showPage(pageId) {
+    // ... (kode bagian atas showPage biarkan saja) ...
+
     // 1. Ganti Halaman (UI Saja)
     document.querySelectorAll('.page-section').forEach(el => el.classList.add('d-none'));
     const targetPage = document.getElementById('page-' + pageId);
@@ -298,51 +300,45 @@ function showPage(pageId) {
     // 4. Khusus Menu Riwayat: Pastikan Submenu Terbuka
     if(pageId === 'riwayat-jual' || pageId === 'riwayat-beli' || pageId === 'riwayat-piutang') {
         const collapseRiwayat = document.getElementById('submenu-riwayat');
-        // Jika tertutup, buka secara manual
         if(collapseRiwayat && !collapseRiwayat.classList.contains('show')) {
             new bootstrap.Collapse(collapseRiwayat, { show: true });
         }
     }
     
-    // --- LOAD DATA (Sama seperti sebelumnya) ---
-    if(pageId === 'riwayat-jual') {
-        setAutoDate('jual'); 
-        loadRiwayatJual(); 
-    }
-    if(pageId === 'riwayat-beli') {
-        setAutoDate('beli'); 
-        loadRiwayatBeli(); 
-    }
+    // --- LOAD DATA ---
+    if(pageId === 'riwayat-jual') { setAutoDate('jual'); loadRiwayatJual(); }
+    if(pageId === 'riwayat-beli') { setAutoDate('beli'); loadRiwayatBeli(); }
     if(pageId === 'riwayat-piutang') loadPiutang();
     if(pageId === 'pembelian') loadPembelianData();
-    if(pageId === 'edit-produk') {
-       // Opsional: Jika user refresh saat di halaman edit, kembalikan ke produk
-       // showPage('produk'); 
-    }
+    if(pageId === 'payroll') { loadKaryawan(); loadKasbon(); }
 
-    // --- PERBAIKAN: Load data karyawan saat menu Payroll dibuka ---
-    if(pageId === 'payroll') {
-        loadKaryawan(); 
-        loadKasbon(); // Opsional: sekalian load kasbon biar siap
-    }
-
+    // --- [PERBAIKAN ANTI BOCOR] ---
     if (pageId === 'laporan') {
-    // 1. [FIX] Paksa Reset ke Tab Pertama (Laba) setiap kali menu dibuka
-    // Ini akan memperbaiki tampilan yang berantakan/tumpang tindih
-    const triggerFirstTab = document.querySelector('#laporanTabs button[data-bs-target="#tab-laba"]');
-    if(triggerFirstTab) {
-        bootstrap.Tab.getOrCreateInstance(triggerFirstTab).show();
-    }
+        // 1. HARD RESET: Buang class 'active' & 'show' dari SEMUA konten tab laporan
+        // Ini memastikan tidak ada konten tab lain (Saldo/Beban) yang masih nyangkut/muncul
+        document.querySelectorAll('#laporanTabsContent .tab-pane').forEach(el => {
+            el.classList.remove('show', 'active');
+        });
 
-    // 2. Load Data (Logic Lama)
-    // Cek apakah tanggal sudah terisi? Jika belum, set default bulan ini
-    // (Pastikan mengecek _flatpickr dulu agar tanggal muncul)
-    const elStart = document.getElementById('lap-start');
-    if (!elStart.value) {
-        setFilterLaporan('bulan_ini');
-    } else {
-        loadLaporanUtama();
-    }
+        // 2. Reset status tombol navigasi tab (pills)
+        document.querySelectorAll('#laporanTabs .nav-link').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        // 3. Aktifkan Manual Tab Pertama (Laba)
+        const tabLaba = document.getElementById('tab-laba');
+        const btnLaba = document.getElementById('tab-laba-btn');
+
+        if(tabLaba) tabLaba.classList.add('show', 'active');
+        if(btnLaba) btnLaba.classList.add('active');
+
+        // 4. Load Data Laporan
+        const elStart = document.getElementById('lap-start');
+        if (!elStart.value) {
+            setFilterLaporan('bulan_ini');
+        } else {
+            loadLaporanUtama();
+        }
     }
 }
 
@@ -745,10 +741,32 @@ function prosesGantiPassword() {
 
 
 function loadDashboard(startDate = null, endDate = null) {
-  // Loading state
-  const incomeEl = document.getElementById('dash-main-income');
-  if(incomeEl) incomeEl.innerText = 'Loading...';
+  // --- 1. SET LOADING STATE UNTUK SEMUA ELEMEN ---
+  // Kita ubah semua angka jadi "..." atau "Loading" sebelum data datang
   
+  const setHtml = (id, html) => {
+      const el = document.getElementById(id);
+      if(el) el.innerHTML = html;
+  };
+
+  // Kartu Pendapatan & Pengeluaran
+  setHtml('dash-main-income', '<span class="spinner-border spinner-border-sm"></span>');
+  setHtml('dash-avg-trx', 'Menghitung...');
+  setHtml('dash-main-expense', '<span class="spinner-border spinner-border-sm"></span>');
+  setHtml('dash-retur', 'Menghitung...');
+
+  // Kartu Pesanan & Refill
+  setHtml('dash-count-order', '...');
+  setHtml('dash-count-pel', 'Memuat...');
+  setHtml('dash-count-refill', '...');
+
+  // Info Periode
+  setHtml('dash-periode-info', 'Sedang memuat data...');
+
+  // Tabel Top Produk
+  setHtml('tabel-top-produk', '<tr><td colspan="2" class="text-center py-4 text-muted"><div class="spinner-border text-primary spinner-border-sm mb-2"></div><br>Sedang menganalisa produk...</td></tr>');
+
+  // --- 2. PANGGIL DATA DARI SERVER ---
   google.script.run.withSuccessHandler(res => {
     const stats = res.stats;
     const accounts = res.accounts;
@@ -768,26 +786,52 @@ function loadDashboard(startDate = null, endDate = null) {
     
     document.getElementById('dash-count-refill').innerText = stats.qtyRefill + " Pcs";
 
-      // 4. RENDER TABEL PRODUK
-    const prodTable = document.getElementById('tabel-top-produk');
+    // 3. RENDER TABEL TOP PRODUK
+const prodTable = document.getElementById('tabel-top-produk');
     if(prodTable) {
         prodTable.innerHTML = '';
         const sortedProduk = Object.entries(stats.produkTerjual).sort(([,a],[,b]) => b - a);
+        
         if(sortedProduk.length === 0) {
-            prodTable.innerHTML = '<tr><td class="text-center text-muted">Tidak ada data.</td></tr>';
+            prodTable.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-4 small">Belum ada data penjualan.</td></tr>';
         } else {
-            sortedProduk.forEach(([nama, qty]) => {
+            // Ambil penjualan tertinggi sebagai acuan 100% progress bar
+            const maxQty = sortedProduk[0][1]; 
+
+            // Ambil 5 Besar saja
+            sortedProduk.slice(0, 5).forEach(([nama, qty], index) => {
+                const rank = index + 1;
+                // Hitung lebar bar (persentase)
+                const percent = (qty / maxQty) * 100;
+                
+                // Tentukan Warna Badge Ranking
+                let badgeRank = `<span class="badge bg-light text-secondary border" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:50%;">${rank}</span>`;
+                
+                if(rank === 1) badgeRank = `<span class="badge bg-warning text-dark border border-warning shadow-sm" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:50%;">1</span>`;
+                if(rank === 2) badgeRank = `<span class="badge bg-secondary text-white border border-secondary shadow-sm" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:50%;">2</span>`;
+                if(rank === 3) badgeRank = `<span class="badge bg-white text-secondary border shadow-sm" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:50%;">3</span>`;
+
                 prodTable.innerHTML += `
                 <tr>
-                    <td class="ps-3"><span class="fw-bold text-dark" style="font-size:13px">${nama}</span></td>
-                    <td class="text-end pe-3"><span class="badge bg-light text-dark border fw-bold">${qty}</span></td>
+                    <td class="ps-3 py-3" style="width: 40px; vertical-align:top;">
+                        ${badgeRank}
+                    </td>
+                    <td class="pe-3 py-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                             <span class="fw-bold text-dark text-truncate" style="font-size:13px; max-width:500px;">${nama}</span>
+                             <span class="fw-bold text-primary" style="font-size:12px;">${qty} Terjual</span>
+                        </div>
+                        <div class="progress" style="height: 6px; border-radius: 10px; background-color: #f0f2f5;">
+                            <div class="progress-bar bg-primary" role="progressbar" style="width: ${percent}%; border-radius: 10px;"></div>
+                        </div>
+                    </td>
                 </tr>`;
             });
         }
     }
 
-    // 5. RENDER CHART
-    renderCharts(stats); // Panggil fungsi renderCharts yg sudah dibuat sebelumnya
+    // 4. RENDER CHART
+    renderCharts(stats); 
 
   }).getDashboardRealtime(startDate, endDate);
 }
