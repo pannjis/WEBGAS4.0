@@ -326,24 +326,23 @@ function showPage(pageId) {
         loadKasbon(); // Opsional: sekalian load kasbon biar siap
     }
 
-if (pageId === 'laporan') {
-        // 1. [FIX] Paksa Reset ke Tab Pertama (Laba)
-        const triggerFirstTab = document.querySelector('#laporanTabs button[data-bs-target="#tab-laba"]');
-        if(triggerFirstTab) {
-            bootstrap.Tab.getOrCreateInstance(triggerFirstTab).show();
-        }
+    if (pageId === 'laporan') {
+    // 1. [FIX] Paksa Reset ke Tab Pertama (Laba) setiap kali menu dibuka
+    // Ini akan memperbaiki tampilan yang berantakan/tumpang tindih
+    const triggerFirstTab = document.querySelector('#laporanTabs button[data-bs-target="#tab-laba"]');
+    if(triggerFirstTab) {
+        bootstrap.Tab.getOrCreateInstance(triggerFirstTab).show();
+    }
 
-        // 2. Load Saldo Akun (Selalu panggil ini di sini)
-        // Letakkan di luar if-else agar selalu muncul
-        loadLaporanSaldoAkun(); 
-
-        // 3. Load Data Laporan Utama (Cek Tanggal)
-        const elStart = document.getElementById('lap-start');
-        if (!elStart.value) {
-            setFilterLaporan('bulan_ini'); // Ini akan set tanggal & loadLaporanUtama
-        } else {
-            loadLaporanUtama(); // Load data utama saja
-        }
+    // 2. Load Data (Logic Lama)
+    // Cek apakah tanggal sudah terisi? Jika belum, set default bulan ini
+    // (Pastikan mengecek _flatpickr dulu agar tanggal muncul)
+    const elStart = document.getElementById('lap-start');
+    if (!elStart.value) {
+        setFilterLaporan('bulan_ini');
+    } else {
+        loadLaporanUtama();
+    }
     }
 }
 
@@ -769,7 +768,7 @@ function loadDashboard(startDate = null, endDate = null) {
     
     document.getElementById('dash-count-refill').innerText = stats.qtyRefill + " Pcs";
 
-      // 3. RENDER TABEL PRODUK
+      // 4. RENDER TABEL PRODUK
     const prodTable = document.getElementById('tabel-top-produk');
     if(prodTable) {
         prodTable.innerHTML = '';
@@ -787,7 +786,7 @@ function loadDashboard(startDate = null, endDate = null) {
         }
     }
 
-    // 4. RENDER CHART
+    // 5. RENDER CHART
     renderCharts(stats); // Panggil fungsi renderCharts yg sudah dibuat sebelumnya
 
   }).getDashboardRealtime(startDate, endDate);
@@ -5704,68 +5703,6 @@ function renderLaporanUI(data) {
             `;
         });
     }
-}
-
-// --- FUNGSI BARU: LOAD SALDO AKUN DI HALAMAN LAPORAN ---
-function loadLaporanSaldoAkun() {
-    const tb = document.querySelector('#tabel-laporan-akun tbody');
-    // Loading state halus
-    tb.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm text-secondary"></div></td></tr>';
-
-    google.script.run.withSuccessHandler(data => {
-        tb.innerHTML = '';
-        
-        if(!data || data.length === 0) {
-            tb.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-3">Belum ada akun.</td></tr>';
-            return;
-        }
-
-        let totalSaldo = 0;
-
-        data.forEach(acc => {
-            totalSaldo += acc.saldo;
-            
-            // Ikon kecil berdasarkan tipe
-            let icon = 'account_balance'; // Default Bank
-            let textClass = 'text-dark';
-            
-            if(acc.nama.toLowerCase().includes('tunai') || acc.tipe === 'Tunai') {
-                icon = 'payments';
-                textClass = 'text-success';
-            } else if (acc.tipe === 'E-Wallet') {
-                icon = 'smartphone';
-                textClass = 'text-info';
-            }
-
-            tb.innerHTML += `
-            <tr>
-                <td class="ps-3 py-2">
-                    <div class="d-flex align-items-center">
-                        <i class="material-icons text-muted me-2" style="font-size:16px">${icon}</i>
-                        <div>
-                            <div class="fw-bold text-dark" style="font-size:12px">${acc.nama}</div>
-                            <small class="text-muted" style="font-size:10px">${acc.tipe}</small>
-                        </div>
-                    </div>
-                </td>
-                <td class="text-end pe-3 fw-bold ${textClass}" style="font-size:12px">
-                    ${new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR', minimumFractionDigits:0}).format(acc.saldo)}
-                </td>
-            </tr>
-            `;
-        });
-
-        // Baris Total (Opsional, agar terlihat rekapnya)
-        tb.innerHTML += `
-            <tr class="bg-light border-top">
-                <td class="ps-3 py-2 fw-bold text-muted text-uppercase" style="font-size:11px">Total Aset Likuid</td>
-                <td class="text-end pe-3 fw-bold text-dark" style="font-size:12px">
-                    ${new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR', minimumFractionDigits:0}).format(totalSaldo)}
-                </td>
-            </tr>
-        `;
-
-    }).getDaftarAkun(); // Menggunakan fungsi backend yang sudah ada
 }
 
 // FUNGSI FILTER CEPAT (Dropdown) - SUDAH DIPERBAIKI SUPORT FLATPICKR
