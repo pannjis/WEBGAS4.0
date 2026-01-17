@@ -1962,16 +1962,16 @@ function initTanggal() {
         disableMobile: "true"
     };
 
-    // 1. Tambahkan #lap-start di sini
-    flatpickr("#filter-jual-start, #filter-beli-start, #filter-keu-start, #lap-start", {
+    // 1. Tambahkan #dash-filter-start
+    flatpickr("#filter-jual-start, #filter-beli-start, #filter-keu-start, #lap-start, #dash-filter-start", {
         ...baseConfig,
-        defaultDate: firstDay // Default tanggal 1
+        defaultDate: firstDay 
     });
 
-    // 2. Tambahkan #lap-end di sini
-    flatpickr("#filter-jual-end, #filter-beli-end, #filter-keu-end, #lap-end", {
+    // 2. Tambahkan #dash-filter-end
+    flatpickr("#filter-jual-end, #filter-beli-end, #filter-keu-end, #lap-end, #dash-filter-end", {
         ...baseConfig,
-        defaultDate: today // Default hari ini
+        defaultDate: today 
     });
 
     // 3. Init Kolom Jatuh Tempo (Set Default: 7 Hari lagi)
@@ -1997,6 +1997,65 @@ function initTanggal() {
         ...baseConfig,
         defaultDate: today
     });
+}
+
+// --- [BARU] LOGIKA FILTER DASHBOARD ---
+
+// 1. Eksekusi Filter (Dipanggil tombol Filter)
+function terapkanFilterDashboard() {
+    const start = document.getElementById('dash-filter-start').value;
+    const end = document.getElementById('dash-filter-end').value;
+
+    if(!start || !end) {
+        return myAlert('Filter Error', 'Harap isi tanggal awal dan akhir.', 'warning');
+    }
+
+    // Panggil fungsi loadDashboard yang sudah ada, tapi dengan parameter
+    loadDashboard(start, end);
+}
+
+// 2. Logika Dropdown Cepat (Copy logic dari setFilterCepat tapi khusus dashboard)
+function setFilterDashboard(pilihan) {
+    const now = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    // Helper Format YYYY-MM-DD
+    const fmt = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const d_str = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d_str}`;
+    };
+
+    if (pilihan === "bulan_ini") {
+        start = new Date(now.getFullYear(), now.getMonth(), 1); // Tgl 1
+    } else if (pilihan === "bulan_lalu") {
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 0); 
+    } else if (pilihan === "kemarin") {
+        start.setDate(now.getDate() - 1);
+        end.setDate(now.getDate() - 1);
+    } else if (pilihan === "7_hari") {
+        start.setDate(now.getDate() - 6);
+    } else if (pilihan === "hari_ini") {
+        // default now
+    } else {
+        return; // Custom
+    }
+
+    // Update Input Tanggal
+    const elStart = document.getElementById('dash-filter-start');
+    const elEnd = document.getElementById('dash-filter-end');
+
+    if (elStart._flatpickr) elStart._flatpickr.setDate(fmt(start), true);
+    else elStart.value = fmt(start);
+
+    if (elEnd._flatpickr) elEnd._flatpickr.setDate(fmt(end), true);
+    else elEnd.value = fmt(end);
+
+    // Langsung load data tanpa tekan tombol filter lagi (Opsional, agar cepat)
+    terapkanFilterDashboard();
 }
 
 // [UPDATE] Fungsi Auto Date agar support Flatpickr & Tampilan Langsung Muncul
