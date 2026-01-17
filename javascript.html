@@ -2916,6 +2916,19 @@ function bukaEditKaryawan(id) {
         setVal('kry-darurat-nama', k[10]);
         setVal('kry-darurat-telp', k[11]);
         
+        // Handle Tanggal Masuk (Safe Check)
+        try {
+            if(k[16]) { // Index 16 = Kolom Q
+                let dm = new Date(k[16]);
+                let yyyy = dm.getFullYear();
+                let mm = String(dm.getMonth()+1).padStart(2,'0');
+                let dd = String(dm.getDate()).padStart(2,'0');
+                setVal('kry-tgl-masuk', `${yyyy}-${mm}-${dd}`);
+            } else {
+                setVal('kry-tgl-masuk', '');
+            }
+        } catch(e) { setVal('kry-tgl-masuk', ''); }
+        
         // Format Angka (Safe)
         const gaji = k[12] ? Number(k[12]) : 0;
         const bonus = k[13] ? Number(k[13]) : 0;
@@ -2987,6 +3000,7 @@ function simpanKaryawanDB() {
         // Hapus titik pada format rupiah
         gaji: getVal('kry-gaji').replace(/\./g, ''),
         bonus: getVal('kry-bonus').replace(/\./g, ''),
+        tglMasuk: getVal('kry-tgl-masuk'), // <--- TAMBAHKAN INI
         foto: null
     };
 
@@ -3673,11 +3687,13 @@ function hitungTotalModal() {
     document.getElementById('ver-total').innerText = rupiah(total);
 }
 
-// [BARU] Simpan Perubahan ke Session Data
 function simpanVerifikasiKaryawan() {
     const index = document.getElementById('ver-index').value;
     
-    // Ambil Data Bersih
+    // 1. AMBIL GAJI DARI INPUT (Karena sekarang bisa diedit manual untuk Pro-rata)
+    const gajiBaru = Number(document.getElementById('ver-gaji').value.replace(/\./g, '')) || 0;
+
+    // 2. Ambil Data Lainnya
     const bonus = Number(document.getElementById('ver-bonus').value.replace(/\./g, '')) || 0;
     const cicilan = Number(document.getElementById('ver-potongan-kasbon').value.replace(/\./g, '')) || 0;
     const potLain = Number(document.getElementById('ver-potongan-lain').value.replace(/\./g, '')) || 0;
@@ -3689,22 +3705,16 @@ function simpanVerifikasiKaryawan() {
         ketKasbon = document.getElementById('ver-kasbon-ket').value;
     }
 
-    // Validasi Sederhana
-    if(cicilan > sessionPayrollData[index].sisaHutang) {
-        // Opsional: Boleh bayar lebih buat lunasin? Boleh aja sih.
-        // if(!confirm('Potongan cicilan melebihi sisa hutang. Lanjutkan?')) return;
-    }
-
-    // Update Object Session
+    // 3. Update Object Session dengan GAJI BARU
+    sessionPayrollData[index].gaji = gajiBaru; // <--- INI KUNCINYA
     sessionPayrollData[index].bonus = bonus;
     sessionPayrollData[index].kasbonPotongan = cicilan;
     sessionPayrollData[index].potonganLain = potLain;
     sessionPayrollData[index].kasbonBaru = kasbonBaru;
     sessionPayrollData[index].ketKasbonBaru = ketKasbon;
     
-    // Hitung Total Final untuk Data
-    // THP = (Gaji + Bonus + KasbonBaru) - (Cicilan + PotonganLain)
-    sessionPayrollData[index].total = (sessionPayrollData[index].gaji + bonus + kasbonBaru) - (cicilan + potLain);
+    // 4. Hitung Total Final (Gaji Baru + Bonus ...)
+    sessionPayrollData[index].total = (gajiBaru + bonus + kasbonBaru) - (cicilan + potLain);
     
     // Set Status
     sessionPayrollData[index].statusVerifikasi = 'Sesuai';
@@ -5219,6 +5229,9 @@ function cetakRekapKasbonFull(data) {
 
 // --- FUNGSI CETAK SLIP GAJI KARYAWAN ---
 function cetakSlipGaji(data) {
+    // --- TAMBAHAN BARU: Bikin idGaji isinya angka saja (Hapus huruf) ---
+    data.idGaji = data.id ? data.id.replace(/\D/g, '') : '-'; 
+
     // 1. Ambil Profil Perusahaan
     const namaPT = globalCompanyProfile.nama_perusahaan || 'PERUSAHAAN ANDA';
     const alamatPT = globalCompanyProfile.alamat || '-';
@@ -5299,12 +5312,11 @@ function cetakSlipGaji(data) {
             <div style="display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 12px;">
                 <table>
                     <tr><td class="lbl" width="100">Periode</td><td>: ${data.periode}</td></tr>
-                    <tr><td class="lbl">ID Karyawan</td><td>: ${data.id}</td></tr>
+                    <tr><td class="lbl">ID Transaksi</td><td>: ${data.id}</td></tr>
                     <tr><td class="lbl">Nama</td><td>: <b>${data.nama}</b></td></tr>
                 </table>
                 <div style="text-align: right;">
                     <small>Dicetak: ${new Date().toLocaleDateString('id-ID')}</small><br>
-                    <small style="font-family: monospace;">Ref: ${data.idGaji}</small>
                 </div>
             </div>
 
