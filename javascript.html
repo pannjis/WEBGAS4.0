@@ -323,6 +323,25 @@ function showPage(pageId) {
         loadKaryawan(); 
         loadKasbon(); // Opsional: sekalian load kasbon biar siap
     }
+
+    if (pageId === 'laporan') {
+    // 1. [FIX] Paksa Reset ke Tab Pertama (Laba) setiap kali menu dibuka
+    // Ini akan memperbaiki tampilan yang berantakan/tumpang tindih
+    const triggerFirstTab = document.querySelector('#laporanTabs button[data-bs-target="#tab-laba"]');
+    if(triggerFirstTab) {
+        bootstrap.Tab.getOrCreateInstance(triggerFirstTab).show();
+    }
+
+    // 2. Load Data (Logic Lama)
+    // Cek apakah tanggal sudah terisi? Jika belum, set default bulan ini
+    // (Pastikan mengecek _flatpickr dulu agar tanggal muncul)
+    const elStart = document.getElementById('lap-start');
+    if (!elStart.value) {
+        setFilterLaporan('bulan_ini');
+    } else {
+        loadLaporanUtama();
+    }
+    }
 }
 
 function handleLogin() {
@@ -723,17 +742,25 @@ function prosesGantiPassword() {
 }
 
 
-  // --- DASHBOARD ---
-  function loadDashboard() {
-    loading(true);
-    google.script.run.withSuccessHandler(s => {
-      loading(false);
-      document.getElementById('dash-income').innerText = rupiah(s.income);
-      document.getElementById('dash-expense').innerText = rupiah(s.expense);
-      document.getElementById('dash-net').innerText = rupiah(s.net);
-      document.getElementById('lap-net').innerText = rupiah(s.net);
-    }).getDashboardStats();
-  }
+function loadDashboard() {
+  // loading(true); // Opsional: Matikan loading disini jika mengganggu flow awal
+  google.script.run.withSuccessHandler(s => {
+    loading(false);
+    
+    // Cek dulu apakah elemennya ada sebelum diisi (Safety Check)
+    if(document.getElementById('dash-income')) {
+        document.getElementById('dash-income').innerText = rupiah(s.income);
+    }
+    if(document.getElementById('dash-expense')) {
+        document.getElementById('dash-expense').innerText = rupiah(s.expense);
+    }
+    if(document.getElementById('dash-net')) {
+        document.getElementById('dash-net').innerText = rupiah(s.net);
+    }
+
+    // Baris 'lap-net' SUDAH DIHAPUS agar tidak error
+  }).getDashboardStats();
+}
 
   // --- PRODUK & KASIR ---
 function loadProduk() {
@@ -1763,9 +1790,8 @@ function terapkanFilter(tipe) {
 // --- KONFIGURASI TANGGAL (FIX ANTI BLANK) ---
 function initTanggal() {
     const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1); // Tgl 1 Bulan Ini
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1); 
 
-    // Config Dasar
     const baseConfig = {
         dateFormat: "Y-m-d",
         altInput: true,
@@ -1775,16 +1801,16 @@ function initTanggal() {
         disableMobile: "true"
     };
 
-    // 1. Init Kolom "DARI TANGGAL" (Set Default: Tanggal 1)
-    flatpickr("#filter-jual-start, #filter-beli-start", {
+    // 1. Tambahkan #lap-start di sini
+    flatpickr("#filter-jual-start, #filter-beli-start, #filter-keu-start, #lap-start", {
         ...baseConfig,
-        defaultDate: firstDay // <--- INI KUNCINYA (Langsung isi Tgl 1)
+        defaultDate: firstDay // Default tanggal 1
     });
 
-    // 2. Init Kolom "SAMPAI TANGGAL" (Set Default: Hari Ini)
-    flatpickr("#filter-jual-end, #filter-beli-end", {
+    // 2. Tambahkan #lap-end di sini
+    flatpickr("#filter-jual-end, #filter-beli-end, #filter-keu-end, #lap-end", {
         ...baseConfig,
-        defaultDate: today // <--- INI KUNCINYA (Langsung isi Hari Ini)
+        defaultDate: today // Default hari ini
     });
 
     // 3. Init Kolom Jatuh Tempo (Set Default: 7 Hari lagi)
@@ -1811,6 +1837,7 @@ function initTanggal() {
         defaultDate: today
     });
 }
+
 // [UPDATE] Fungsi Auto Date agar support Flatpickr & Tampilan Langsung Muncul
 function setAutoDate(tipe) {
     const now = new Date();
@@ -3407,10 +3434,13 @@ function initPenggajian() {
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const picker = document.getElementById('filter-periode-gaji');
     
+    // 1. Jika kosong, isi tanggal default dulu
     if(!picker.value) {
         picker.value = `${yyyy}-${mm}`;
-        cekDataGaji(); // Auto load
     }
+
+    // 2. [SOLUSI] Selalu panggil fungsi load data setiap kali fungsi ini jalan
+    cekDataGaji(); 
 }
 
 // [UPDATE FIX] Cek Data Gaji (Support Karyawan Susulan)
@@ -3613,12 +3643,21 @@ function renderTabelPayroll() {
     }
 }
 
-// [BARU] Buka Modal & Isi Data
+// [UPDATE] Buka Modal & Isi Data (Dengan Tombol Batal Verifikasi)
 function bukaModalVerifikasi(index) {
     const data = sessionPayrollData[index];
     
     document.getElementById('ver-index').value = index;
     document.getElementById('ver-nama').innerText = data.nama;
+    document.getElementById('ver-jabatan').innerText = data.statusVerifikasi === 'Sesuai' ? 'SUDAH DIVERIFIKASI' : 'Status: Draft';
+    
+    // Warnai badge status di modal biar jelas
+    const badgeEl = document.getElementById('ver-jabatan');
+    if(data.statusVerifikasi === 'Sesuai') {
+        badgeEl.className = 'badge bg-success text-white border';
+    } else {
+        badgeEl.className = 'badge bg-light text-dark border';
+    }
     
     // Set Nilai Input (Format Ribuan)
     document.getElementById('ver-gaji').value = Number(data.gaji).toLocaleString('id-ID');
@@ -3650,7 +3689,44 @@ function bukaModalVerifikasi(index) {
     }
 
     hitungTotalModal(); // Hitung awal
+
+    // --- LOGIKA BARU: TOMBOL DRAFT ---
+    const modalFooter = document.querySelector('#modalDetailGaji .modal-footer');
+    let btnDraft = '';
+
+    // Jika statusnya sudah SESUAI, munculkan tombol "Kembalikan ke Draft" warna Kuning
+    if(data.statusVerifikasi === 'Sesuai') {
+        btnDraft = `
+        <button type="button" class="btn btn-warning rounded-pill me-auto fw-bold text-dark shadow-sm" onclick="kembalikanKeDraft(${index})">
+            <i class="material-icons align-middle">undo</i> Jadi Draft Lagi
+        </button>`;
+    }
+
+    modalFooter.innerHTML = `
+        ${btnDraft}
+        <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Tutup</button>
+        <button type="button" class="btn btn-success rounded-pill fw-bold px-4 shadow" onclick="simpanVerifikasiKaryawan()">
+            <i class="material-icons align-middle me-1">check_circle</i> ${data.statusVerifikasi === 'Sesuai' ? 'UPDATE DATA' : 'SESUAI'}
+        </button>
+    `;
+
     new bootstrap.Modal(document.getElementById('modalDetailGaji')).show();
+}
+
+// [BARU] Fungsi untuk membatalkan status Sesuai menjadi Draft
+function kembalikanKeDraft(index) {
+    // 1. Ubah status data di memori sementara
+    sessionPayrollData[index].statusVerifikasi = 'Draft';
+
+    // 2. Tutup Modal
+    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modalDetailGaji'));
+    if(modalInstance) modalInstance.hide();
+
+    // 3. Render ulang tabel (Baris akan kembali jadi abu-abu/putih)
+    renderTabelPayroll();
+
+    // 4. Notif kecil (Opsional)
+    // myAlert('Info', 'Status dikembalikan ke Draft.', 'info');
 }
 
 // [BARU] Toggle Input Kasbon Baru
@@ -5360,6 +5436,317 @@ function cetakSlipGaji(data) {
     win.document.close();
 }
 
+// --- LOGIKA LAPORAN BARU ---
+
+function loadLaporanUtama() {
+    const start = document.getElementById('lap-start').value;
+    const end = document.getElementById('lap-end').value;
+    
+    if(!start || !end) return; // Tunggu date terisi
+
+    loading(true);
+    google.script.run.withSuccessHandler(data => {
+        loading(false);
+        renderLaporanUI(data);
+    }).getLaporanDetail(start, end);
+}
+
+function renderLaporanUI(data) {
+    const rp = (n) => new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR', minimumFractionDigits:0}).format(n);
+
+    // 1. ISI KARTU UTAMA (SUB MENU 1.1)
+    document.getElementById('lap-pendapatan').innerText = rp(data.pendapatan);
+    document.getElementById('lap-hpp').innerText = rp(data.hpp);
+    document.getElementById('lap-kotor').innerText = rp(data.labaKotor);
+    document.getElementById('lap-beban').innerText = rp(data.pengeluaran);
+    document.getElementById('lap-bersih').innerText = rp(data.labaBersih);
+    
+    document.getElementById('lap-stok').innerText = rp(data.nilaiStok);
+    document.getElementById('lap-beli').innerText = rp(data.pembelian);
+
+    // 2. ISI TABEL METODE BAYAR (SUB MENU 1.2)
+    const tbMetode = document.querySelector('#tabel-metode-bayar tbody');
+    tbMetode.innerHTML = '';
+    
+    // Urutkan key agar rapi
+    Object.keys(data.metodeBayar).forEach(m => {
+        let nominal = data.metodeBayar[m];
+        tbMetode.innerHTML += `
+            <tr>
+                <td class="ps-3 fw-bold text-muted">${m}</td>
+                <td class="text-end pe-3 fw-bold text-dark">${rp(nominal)}</td>
+            </tr>
+        `;
+    });
+
+    // 3. ISI TABEL PENGELUARAN (SUB MENU 2)
+    document.getElementById('lap-beban-total').innerText = rp(data.pengeluaran); // Total di Tab 2
+    
+    const tbBeban = document.querySelector('#tabel-det-pengeluaran tbody');
+    tbBeban.innerHTML = '';
+
+    if(data.listPengeluaran.length === 0) {
+        tbBeban.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">Tidak ada pengeluaran pada periode ini.</td></tr>';
+    } else {
+        data.listPengeluaran.forEach(r => {
+            let tgl = new Date(r.tanggal).toLocaleDateString('id-ID');
+            tbBeban.innerHTML += `
+                <tr>
+                    <td class="fw-bold text-primary" style="font-size:12px">${r.id}</td>
+                    <td>${tgl}</td>
+                    <td><span class="badge bg-light text-dark border">${r.kategori}</span></td>
+                    <td class="text-muted small">${r.ket}</td>
+                    <td class="text-end fw-bold text-danger">${rp(r.jumlah)}</td>
+                </tr>
+            `;
+        });
+    }
+}
+
+// FUNGSI FILTER CEPAT (Dropdown) - SUDAH DIPERBAIKI SUPORT FLATPICKR
+function setFilterLaporan(pilihan) {
+    const now = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    // Helper Format YYYY-MM-DD
+    const fmt = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const d_str = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d_str}`;
+    };
+
+    if (pilihan === "bulan_ini") {
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (pilihan === "bulan_lalu") {
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 0); 
+    } else if (pilihan === "kemarin") {
+        start.setDate(now.getDate() - 1);
+        end.setDate(now.getDate() - 1);
+    } else if (pilihan === "7_hari") {
+        start.setDate(now.getDate() - 6);
+    } 
+    // "hari_ini" default start=now, end=now
+
+    // --- PERBAIKAN UTAMA DI SINI ---
+    const elStart = document.getElementById('lap-start');
+    const elEnd = document.getElementById('lap-end');
+
+    // Cek apakah elemen ini dikendalikan oleh Flatpickr?
+    if (elStart._flatpickr) {
+        elStart._flatpickr.setDate(start, true); // true = trigger change event
+    } else {
+        elStart.value = fmt(start);
+    }
+
+    if (elEnd._flatpickr) {
+        elEnd._flatpickr.setDate(end, true);
+    } else {
+        elEnd.value = fmt(end);
+    }
+
+    // Trigger Load Data
+    loadLaporanUtama();
+}
+
+// --- EKSPOR PDF & EXCEL (Sederhana) ---
+function exportLaporanExcel() {
+    // Gunakan fungsi export yang sudah ada, tapi targetkan tabel spesifik
+    // Untuk Laporan Lengkap, idealnya buat endpoint khusus, tapi untuk cepat:
+    // Kita export tabel Pengeluaran saja dulu atau buat HTML khusus hidden table
+    alert('Fitur Excel Full Report akan segera hadir. Saat ini gunakan Print PDF.');
+}
+
+// --- FUNGSI CETAK LAPORAN PROFESIONAL (A4) ---
+function printLaporanPDFCurrent() {
+    // 1. Cek Tab Mana yang Sedang Aktif?
+    const isTabLabaAktif = document.getElementById('tab-laba').classList.contains('active');
+    
+    // 2. Ambil Data Perusahaan & Periode
+    const namaPT = globalCompanyProfile.nama_perusahaan || 'NAMA PERUSAHAAN';
+    const alamatPT = globalCompanyProfile.alamat || '-';
+    
+    // Format Tanggal Periode
+    const tglStart = new Date(document.getElementById('lap-start').value).toLocaleDateString('id-ID');
+    const tglEnd = new Date(document.getElementById('lap-end').value).toLocaleDateString('id-ID');
+    const periodeStr = `${tglStart} s/d ${tglEnd}`;
+
+    // 3. Siapkan Konten HTML Berdasarkan Tab
+    let judulLaporan = '';
+    let kontenBody = '';
+
+    if (isTabLabaAktif) {
+        judulLaporan = 'LAPORAN LABA RUGI (PROFIT & LOSS)';
+        
+        // Ambil Nilai dari Dashboard
+        const valPendapatan = document.getElementById('lap-pendapatan').innerText;
+        const valHPP = document.getElementById('lap-hpp').innerText;
+        const valKotor = document.getElementById('lap-kotor').innerText;
+        const valBeban = document.getElementById('lap-beban').innerText;
+        const valBersih = document.getElementById('lap-bersih').innerText;
+        
+        const valStok = document.getElementById('lap-stok').innerText;
+        const valBeli = document.getElementById('lap-beli').innerText;
+
+        // Ambil Tabel Metode Bayar
+        const tabelMetodeHTML = document.getElementById('tabel-metode-bayar').innerHTML;
+
+        // Susun Layout Laba Rugi yang Rapi
+        kontenBody = `
+            <div class="summary-box">
+                <table class="table-clean" style="width:100%">
+                    <tr>
+                        <td class="label">A. Pendapatan (Omzet)</td>
+                        <td class="value text-success">${valPendapatan}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">B. Harga Pokok Penjualan (HPP)</td>
+                        <td class="value text-warning">(${valHPP})</td>
+                    </tr>
+                    <tr class="highlight-row">
+                        <td class="label fw-bold">C. LABA KOTOR (A - B)</td>
+                        <td class="value fw-bold">${valKotor}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">D. Pengeluaran Operasional</td>
+                        <td class="value text-danger">(${valBeban})</td>
+                    </tr>
+                    <tr class="highlight-row bg-dark text-white">
+                        <td class="label fw-bold" style="font-size:14pt">G. LABA BERSIH (NET PROFIT)</td>
+                        <td class="value fw-bold" style="font-size:14pt">${valBersih}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="row-cols mt-4">
+                <div class="col-half">
+                    <h4 class="sub-title">Informasi Tambahan</h4>
+                    <table class="table-bordered">
+                        <tr><td>Total Aset Stok</td><td class="text-end fw-bold">${valStok}</td></tr>
+                        <tr><td>Pembelian Stok (Periode Ini)</td><td class="text-end fw-bold">${valBeli}</td></tr>
+                    </table>
+                </div>
+                <div class="col-half">
+                    <h4 class="sub-title">Rincian Metode Pembayaran</h4>
+                    <table class="table-bordered">
+                        <thead><tr style="background:#eee"><th>Metode</th><th class="text-end">Jumlah</th></tr></thead>
+                        ${tabelMetodeHTML}
+                    </table>
+                </div>
+            </div>
+        `;
+
+    } else {
+        judulLaporan = 'LAPORAN PENGELUARAN OPERASIONAL';
+        
+        // Ambil Total & Tabel
+        const valTotalBeban = document.getElementById('lap-beban-total').innerText;
+        
+        // Clone tabel agar tidak merusak tampilan asli (kita mau buang class bootstrap)
+        let tabelAsli = document.getElementById('tabel-det-pengeluaran').cloneNode(true);
+        // Hapus class bootstrap agar style PDF yang menang
+        tabelAsli.className = 'table-bordered full-width'; 
+        
+        kontenBody = `
+            <div class="summary-box mb-4">
+                <div style="font-size:14pt; font-weight:bold; border: 2px solid #dc3545; padding: 15px; display:inline-block; border-radius:8px; color:#dc3545;">
+                    TOTAL PENGELUARAN: ${valTotalBeban}
+                </div>
+            </div>
+            
+            <h4 class="sub-title">Rincian Transaksi</h4>
+            ${tabelAsli.outerHTML}
+        `;
+    }
+
+    // 4. Buka Jendela Print Baru
+    const win = window.open('', '', 'height=800,width=1000');
+    
+    // 5. Template HTML Full (A4 Style)
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="id">
+    <head>
+        <title>${judulLaporan}</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+            
+            @page { 
+                size: A4; 
+                margin: 15mm 20mm; 
+            }
+            
+            body { 
+                font-family: 'Roboto', sans-serif; 
+                color: #000; 
+                -webkit-print-color-adjust: exact; 
+            }
+
+            /* Header Perusahaan */
+            .header { text-align: center; border-bottom: 3px double #000; padding-bottom: 15px; margin-bottom: 25px; }
+            .pt-name { font-size: 20pt; font-weight: 800; text-transform: uppercase; margin: 0; color: #333; }
+            .pt-addr { font-size: 10pt; margin-top: 5px; color: #555; }
+
+            /* Judul Laporan */
+            .report-title { text-align: center; text-transform: uppercase; font-size: 16pt; font-weight: bold; margin-bottom: 5px; text-decoration: underline; }
+            .report-period { text-align: center; font-size: 11pt; color: #555; margin-bottom: 30px; font-style: italic; }
+
+            /* Tabel Bersih (Laba Rugi) */
+            .table-clean td { padding: 8px 5px; border-bottom: 1px dotted #ccc; font-size: 11pt; }
+            .table-clean .label { width: 60%; }
+            .table-clean .value { text-align: right; font-weight: 500; }
+            .highlight-row { background-color: #f8f9fa; font-weight: bold; border-top: 2px solid #ccc; border-bottom: 2px solid #ccc; }
+            .bg-dark { background-color: #333 !important; color: white !important; }
+
+            /* Tabel Garis (Detail) */
+            .table-bordered { width: 100%; border-collapse: collapse; font-size: 10pt; }
+            .table-bordered th, .table-bordered td { border: 1px solid #999; padding: 6px; }
+            .table-bordered th { background-color: #eee; text-transform: uppercase; }
+            .full-width { width: 100%; }
+
+            /* Layout Grid */
+            .row-cols { display: flex; gap: 30px; }
+            .col-half { flex: 1; }
+            .sub-title { border-bottom: 2px solid #333; padding-bottom: 5px; margin-bottom: 10px; font-size: 11pt; text-transform: uppercase; }
+
+            /* Warna Teks */
+            .text-success { color: #198754; }
+            .text-danger { color: #dc3545; }
+            .text-warning { color: #d63384; } /* Pink tua biar jelas di kertas */
+            .text-end { text-align: right; }
+            .fw-bold { font-weight: bold; }
+            
+            /* Footer */
+            .footer { margin-top: 50px; text-align: right; font-size: 9pt; color: #777; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1 class="pt-name">${namaPT}</h1>
+            <div class="pt-addr">${alamatPT}</div>
+        </div>
+
+        <div class="report-title">${judulLaporan}</div>
+        <div class="report-period">Periode: ${periodeStr}</div>
+
+        ${kontenBody}
+
+        <div class="footer">
+            Dicetak otomatis oleh Sistem SiGAS PRO pada ${new Date().toLocaleString('id-ID')}
+        </div>
+
+        <script>
+            setTimeout(() => { window.print(); }, 1000);
+        ` + '</sc' + 'ript>' + `
+    </body>
+    </html>
+    `;
+
+    win.document.write(htmlContent);
+    win.document.close();
+}
 // --- FUNGSI FORMAT RUPIAH SAAT MENGETIK ---
 function formatRupiahInput(input) {
   // 1. Hapus semua karakter selain angka
