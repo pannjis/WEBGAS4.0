@@ -1505,11 +1505,12 @@ function getRiwayatGajiByPeriode(periode) {
            id: riwayatRaw[i][0],
            periode: rowP,
            nama: riwayatRaw[i][3],
-           gaji: parseDuit(riwayatRaw[i][4]), // Ini gaji yang sudah tersimpan (fix)
+           gaji: parseDuit(riwayatRaw[i][4]), 
            bonus: parseDuit(riwayatRaw[i][5]),
            kasbon: parseDuit(riwayatRaw[i][6]),
            total: parseDuit(riwayatRaw[i][7]),
-           status: riwayatRaw[i][8]
+           status: riwayatRaw[i][8],
+           kasbonBaru: parseDuit(riwayatRaw[i][9]) // Baca kolom baru (Kolom J)
         };
      }
   }
@@ -1650,16 +1651,18 @@ function simpanGajiBulanan(periode, listGaji, akunBayar) {
       let potonganLain = Number(k.potonganLain) || 0;
       let totalPotonganDicatat = (Number(k.kasbonPotongan) || 0) + potonganLain;
 
+      // Pisahkan Bonus dan Kasbon Baru
       sheetRiwayat.appendRow([
           'PAY-' + Date.now(), 
           periodeClean, 
           waktu, 
           k.nama, 
           k.gaji, 
-          Number(k.bonus) + nominalKasbonBaru, 
-          totalPotonganDicatat, // Kolom G (Potongan) sekarang sudah benar
+          Number(k.bonus), // Bonus murni (tanpa kasbon)
+          totalPotonganDicatat, 
           k.total, 
-          'Sukses'
+          'Sukses',
+          nominalKasbonBaru // Simpan Kasbon Baru di kolom J (Kolom ke-10)
       ]);
       
       totalKeluarSesiIni += Number(k.total);
