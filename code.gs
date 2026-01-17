@@ -1558,3 +1558,106 @@ function hitungHariKerja(tglMulai, tglSelesai) {
   }
   return count;
 }
+
+// --- MODUL LAPORAN TERPUSAT ---
+
+function getLaporanDetail(startStr, endStr) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // 1. Parsing Tanggal Filter (Set Jam ke 00:00 dan 23:59)
+  const startDate = new Date(startStr); startDate.setHours(0,0,0,0);
+  const endDate = new Date(endStr); endDate.setHours(23,59,59,999);
+
+  // 2. Ambil Semua Data Mentah
+  const prodData = getData('PRODUK');
+  const trxData = getData('TRANSAKSI');
+  const keuData = getData('KEUANGAN');
+  
+  // 3. Inisialisasi Variabel Laporan
+  let laporan = {
+    pendapatan: 0,
+    hpp: 0,           // Harga Pokok Penjualan
+    pengeluaran: 0,   // Beban Operasional
+    pembelian: 0,     // Belanja Stok
+    nilaiStok: 0,     // Aset Stok Saat Ini
+    labaKotor: 0,
+    labaBersih: 0,
+    metodeBayar: {},  // Ringkasan Metode Bayar
+    listPengeluaran: [] // Detail Tabel Pengeluaran
+  };
+
+  // A. HITUNG NILAI STOK SAAT INI (Snapshot)
+  // Rumus: Stok Isi * Harga Beli
+  prodData.forEach(p => {
+    let hargaBeli = Number(p[3]) || 0;
+    let stok = Number(p[4]) || 0;
+    laporan.nilaiStok += (stok * hargaBeli);
+  });
+
+  // B. HITUNG TRANSAKSI (Pendapatan, HPP, Metode Bayar)
+  // Map Harga Beli Produk untuk lookup HPP
+  let mapHargaBeli = {}; 
+  prodData.forEach(p => mapHargaBeli[p[1]] = Number(p[3]) || 0);
+
+  trxData.forEach(row => {
+    let tgl = new Date(row[1]);
+    if (tgl >= startDate && tgl <= endDate) {
+        
+        let produk = row[3];
+        let qty = Number(row[4]);
+        let totalJual = Number(row[5]);
+        let metode = row[8]; // Kolom I
+        let status = row[10];
+
+        // Hanya hitung jika tidak dibatalkan (Opsional: sesuaikan logika status)
+        // Disini kita anggap semua transaksi yg tercatat adalah valid penjualan
+        
+        // 1. Pendapatan
+        laporan.pendapatan += totalJual;
+
+        // 2. HPP (Estimasi: Qty * Harga Beli Terakhir di Master)
+        let modalSatuan = mapHargaBeli[produk] || 0;
+        laporan.hpp += (qty * modalSatuan);
+
+        // 3. Ringkasan Metode Bayar
+        if(!laporan.metodeBayar[metode]) laporan.metodeBayar[metode] = 0;
+        laporan.metodeBayar[metode] += totalJual;
+    }
+  });
+
+  // C. HITUNG KEUANGAN (Pengeluaran & Pembelian Stok)
+  keuData.forEach(row => {
+    let tgl = new Date(row[1]);
+    if (tgl >= startDate && tgl <= endDate) {
+        let jenis = row[2]; // Pemasukan / Pengeluaran
+        let kategori = row[3];
+        let nominal = Number(row[4]);
+        
+        if (jenis === 'Pengeluaran') {
+           // Pisahkan antara "Beli Stok" dan "Beban Operasional"
+           if (kategori === 'Pembelian Stok') {
+              laporan.pembelian += nominal;
+           } else if (kategori !== 'Retur Penjualan') { 
+              // Retur biasanya mengurangi pendapatan, tapi disini kita masukkan ke Pengeluaran Operasional atau abaikan jika sudah handle di struk.
+              // Kita anggap semua pengeluaran selain beli stok adalah Beban.
+              laporan.pengeluaran += nominal;
+              
+              // Masukkan ke List Detail Pengeluaran
+              laporan.listPengeluaran.push({
+                 id: row[0],
+                 tanggal: row[1],
+                 kategori: kategori,
+                 ket: row[5],
+                 jumlah: nominal
+              });
+           }
+        }
+    }
+  });
+
+  // D. FINALISASI (Laba Rugi)
+  laporan.labaKotor = laporan.pendapatan - laporan.hpp;
+  laporan.labaBersih = laporan.labaKotor - laporan.pengeluaran;
+
+  return laporan;
+}
