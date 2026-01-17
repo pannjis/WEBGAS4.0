@@ -1214,69 +1214,89 @@ function hapusKaryawan(id) {
   }
 }
 
-// [UPDATE] Bayar Cicilan Manual (Support Multi Akun)
 function bayarCicilanManual(form) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetKasbon = ss.getSheetByName('KASBON');
   const sheetRiwayat = ss.getSheetByName('RIWAYAT_BAYAR_KASBON');
   const sheetKeu = ss.getSheetByName('KEUANGAN');
   
-  const dataKasbon = sheetKasbon.getDataRange().getValues();
-  const idKasbon = form.idKasbon;
-  const nominalBayar = Number(form.nominal);
-  const akunBayar = form.akun || 'Kas Tunai (Laci)'; // Ambil akun dari form
-  
-  // A. Cari Data Kasbon
-  let rowTarget = -1;
-  let sisaHutang = 0;
-  let namaKaryawan = '';
-
-  for(let i=1; i<dataKasbon.length; i++) {
-     if(dataKasbon[i][0] == idKasbon) {
-        rowTarget = i+1;
-        namaKaryawan = dataKasbon[i][2];
-        let totalHutang = Number(dataKasbon[i][3]);
-        let sudahBayar = Number(dataKasbon[i][6]) || 0;
-        sisaHutang = totalHutang - sudahBayar;
-        
-        if(nominalBayar > sisaHutang) throw new Error("Nominal pembayaran melebihi sisa hutang!");
-        
-        let newSudahBayar = sudahBayar + nominalBayar;
-        sheetKasbon.getRange(rowTarget, 7).setValue(newSudahBayar);
-        
-        if(newSudahBayar >= totalHutang) {
-            sheetKasbon.getRange(rowTarget, 6).setValue('Lunas');
-        }
-        break;
-     }
+  // 1. Validasi
+  if (!form || !form.idKasbon || !form.nominal) {
+    throw new Error("Data pembayaran tidak lengkap.");
   }
 
-  if(rowTarget == -1) throw new Error("Data Kasbon tidak ditemukan.");
+  // --- CARI KOLOM (Sesuai Struktur Anda) ---
+  // Header: ['ID_Kasbon', 'Tanggal', 'Nama_Karyawan', 'Nominal', 'Keterangan', 'Status_Lunas', 'Sudah_Bayar', 'Tenor', 'Angsuran_Per_Bulan']
+  const headers = sheetKasbon.getRange(1, 1, 1, sheetKasbon.getLastColumn()).getValues()[0];
+  const cariIndex = (nama) => headers.findIndex(h => String(h).toLowerCase() === nama.toLowerCase());
 
-  // B. Catat History Pembayaran
+  const idxID = cariIndex("ID_Kasbon");
+  const idxTotal = cariIndex("Nominal");       
+  const idxSudahBayar = cariIndex("Sudah_Bayar"); 
+  const idxStatus = cariIndex("Status_Lunas");
+
+  if (idxID === -1 || idxTotal === -1 || idxSudahBayar === -1) {
+    throw new Error("Struktur Kolom Sheet KASBON tidak sesuai!");
+  }
+
+  // 2. Cari Data
+  const dataKasbon = sheetKasbon.getDataRange().getValues();
+  let foundRowIndex = -1;
+  let totalPinjam = 0;
+  let sudahBayarLama = 0;
+  
+  for (let i = 1; i < dataKasbon.length; i++) {
+    if (String(dataKasbon[i][idxID]) === String(form.idKasbon)) {
+      foundRowIndex = i + 1; 
+      totalPinjam = Number(dataKasbon[i][idxTotal]) || 0;
+      sudahBayarLama = Number(dataKasbon[i][idxSudahBayar]) || 0;
+      break;
+    }
+  }
+
+  if (foundRowIndex === -1) throw new Error("ID Kasbon tidak ditemukan.");
+
+  // 3. Hitung
+  const bayarIni = Number(form.nominal);
+  const sudahBayarBaru = sudahBayarLama + bayarIni;
+  const sisaHutangBaru = totalPinjam - sudahBayarBaru; 
+  const statusLunas = sisaHutangBaru <= 0 ? 'Lunas' : 'Belum Lunas';
+
+  // 4. Update Kasbon
+  sheetKasbon.getRange(foundRowIndex, idxSudahBayar + 1).setValue(sudahBayarBaru);
+  sheetKasbon.getRange(foundRowIndex, idxStatus + 1).setValue(statusLunas);
+
+  // 5. CATAT RIWAYAT (UPDATE DISINI AGAR METODE BAYAR JELAS)
+  const timeNow = new Date();
+  const akunTujuan = form.akun || 'Kas Tunai'; // Akun yang dipilih (Misal: Bank BCA)
+  
+  // Kita simpan info akun di kolom KETERANGAN agar muncul di tabel history
+  // Format: "Bayar via Bank BCA"
+  const infoMetode = `Via ${akunTujuan}`; 
+
+  // Header Riwayat: ['ID_Bayar', 'ID_Kasbon', 'Tanggal_Bayar', 'Nominal_Bayar', 'Tipe_Bayar', 'Keterangan']
   sheetRiwayat.appendRow([
-     'PAY-' + Date.now(),
-     idKasbon,
-     new Date(),
-     nominalBayar,
-     `Manual (${akunBayar})`, // Simpan info akun di history
-     form.keterangan || 'Pembayaran Cicilan Manual'
+      'PAY-' + Date.now(),            
+      form.idKasbon,                  
+      timeNow,                        
+      bayarIni,                       
+      'Manual',                       
+      infoMetode  // <--- DISINI KITA TULIS "Via Bank BCA"
   ]);
 
-  // C. Catat Pemasukan Keuangan (SESUAI AKUN YANG DIPILIH)
+  // 6. Catat Keuangan (Agar Saldo Bertambah)
   sheetKeu.appendRow([
-     'INC-' + Date.now(), 
-     new Date(), 
-     'Pemasukan', 
+     'INC-' + Date.now(),   
+     timeNow,               
+     'Pemasukan',           
      'Cicilan Kasbon', 
-     nominalBayar, 
-     `Cicilan ${namaKaryawan}`, 
-     akunBayar // <--- INI KUNCINYA (Masuk ke kolom Akun di sheet Keuangan)
+     bayarIni, 
+     `Cicilan Hutang ${form.namaKaryawan || ''} (${infoMetode})`, 
+     akunTujuan             
   ]);
-
+  
   SpreadsheetApp.flush(); 
-
-  return "Pembayaran berhasil dicatat!";
+  return `Pembayaran masuk ke ${akunTujuan}. Sisa Hutang: ${sisaHutangBaru.toLocaleString('id-ID')}`;
 }
 
 // [UPDATE FINAL] Ambil Detail Riwayat Pembayaran Kasbon
@@ -1560,7 +1580,7 @@ function parseDuit(val) {
 }
 
 // [FIX TOTAL] Simpan Gaji Partial (Potongan Kasbon & Saldo Terupdate)
-function simpanGajiBulanan(periode, listGaji) {
+function simpanGajiBulanan(periode, listGaji, akunBayar) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetRiwayat = ss.getSheetByName('RIWAYAT_GAJI');
   const sheetKasbonHistory = ss.getSheetByName('RIWAYAT_BAYAR_KASBON'); 
@@ -1647,6 +1667,9 @@ function simpanGajiBulanan(periode, listGaji) {
 
   // --- 3. KEUANGAN (CATAT PENGELUARAN UANG REAL) ---
   if(totalKeluarSesiIni > 0) {
+     // Gunakan akunBayar yang dikirim dari frontend. Jika kosong, default ke Kas Tunai.
+     const akunFinal = akunBayar || 'Kas Tunai (Laci)';
+     
      keuSheet.appendRow([
          'PAYROLL-' + Date.now(), 
          waktu, 
@@ -1654,7 +1677,7 @@ function simpanGajiBulanan(periode, listGaji) {
          'Gaji Karyawan', 
          totalKeluarSesiIni, 
          `Payroll ${periodeClean} (${listGaji.length} Org)`, 
-         'Kas Tunai (Laci)'
+         akunFinal // <--- INI BAGIAN PENTINGNYA (Dulu hardcode 'Kas Tunai')
      ]);
   }
   
@@ -1777,6 +1800,10 @@ function getLaporanDetail(startStr, endStr) {
   // D. FINALISASI (Laba Rugi)
   laporan.labaKotor = laporan.pendapatan - laporan.hpp;
   laporan.labaBersih = laporan.labaKotor - laporan.pengeluaran;
+
+  // E. TAMBAHAN: AMBIL SALDO AKUN REALTIME
+  // Kita gunakan fungsi getDaftarAkun() yang sudah ada agar hitungannya sinkron
+  laporan.daftarAkun = getDaftarAkun(); 
 
   return laporan;
 }
