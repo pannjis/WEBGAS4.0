@@ -5672,6 +5672,9 @@ function cetakSlipGaji(data) {
                     <div class="rincian-head" style="color: green;">PENERIMAAN (+)</div>
                     <div class="info-row"><span class="lbl">Gaji Pokok</span> <span>${rp(data.gaji)}</span></div>
                     <div class="info-row"><span class="lbl">Bonus / Tunjangan</span> <span>${rp(data.bonus)}</span></div>
+                    
+                    ${data.kasbonBaru > 0 ? `<div class="info-row text-primary"><span class="lbl">Pencairan Kasbon</span> <span>${rp(data.kasbonBaru)}</span></div>` : ''}
+                    
                 </div>
                 <div class="rincian-box">
                     <div class="rincian-head" style="color: red;">POTONGAN (-)</div>
