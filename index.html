@@ -152,11 +152,39 @@
       <h3 class="page-title fw-bold">Dashboard & Monitoring</h3>
       <small class="text-muted" id="dash-periode-info">Periode: Bulan Ini</small>
     </div>
-    <button class="btn btn-light shadow-sm rounded-pill fw-bold" onclick="loadDashboard()">
+    <button class="btn btn-light shadow-sm rounded-pill fw-bold" onclick="terapkanFilterDashboard()">
         <i class="material-icons align-middle text-primary spin-hover">refresh</i> Refresh
     </button>
   </div>
 
+  <div class="card border-0 shadow-sm p-3 mb-4 bg-white">
+      <div class="row g-2 align-items-end">
+         <div class="col-md-3">
+           <label class="small fw-bold text-muted">Filter Cepat</label>
+           <select class="form-select border-secondary fw-bold text-dark" onchange="setFilterDashboard(this.value)">
+              <option value="">-- Custom --</option>
+              <option value="hari_ini">Hari Ini</option>
+              <option value="kemarin">Kemarin</option>
+              <option value="7_hari">7 Hari Terakhir</option>
+              <option value="bulan_ini" selected>Bulan Ini</option>
+              <option value="bulan_lalu">Bulan Lalu</option>
+           </select>
+         </div>
+         <div class="col-md-3">
+            <label class="small fw-bold text-muted">Dari Tanggal</label>
+            <input type="date" id="dash-filter-start" class="form-control bg-light border-0">
+         </div>
+         <div class="col-md-3">
+            <label class="small fw-bold text-muted">Sampai Tanggal</label>
+            <input type="date" id="dash-filter-end" class="form-control bg-light border-0">
+         </div>
+         <div class="col-md-3">
+            <button class="btn btn-dark w-100 fw-bold shadow-sm" onclick="terapkanFilterDashboard()">
+               <i class="material-icons align-middle me-1" style="font-size:16px">filter_alt</i> FILTER DATA
+            </button>
+         </div>
+      </div>
+  </div>
   <div class="row g-3 mb-4">
       <div class="col-md-3">
           <div class="card border-0 shadow-sm h-100 p-3 bg-primary text-white position-relative overflow-hidden">
@@ -1061,7 +1089,7 @@
          <div class="col-md-3">
             <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger">
                <div class="card-body">
-                  <small class="text-uppercase fw-bold text-muted letter-spacing-1">D. Pengeluaran Ops.</small>
+                  <small class="text-uppercase fw-bold text-muted letter-spacing-1">D. Pengeluaran</small>
                   <h4 class="fw-bold text-danger mt-2 mb-0" id="lap-beban">Rp 0</h4>
                </div>
             </div>
@@ -1088,7 +1116,7 @@
                       <h5 class="fw-bold text-dark m-0" id="lap-stok">Rp 0</h5>
                    </div>
                    <div class="border-top pt-3">
-                      <small class="text-uppercase fw-bold text-muted">F. Pembelian Stok (Periode Ini)</small>
+                      <small class="text-uppercase fw-bold text-muted">F. Pembelian Stok</small>
                       <h5 class="fw-bold text-dark m-0" id="lap-beli">Rp 0</h5>
                    </div>
                 </div>
@@ -1098,7 +1126,7 @@
          <div class="col-md-3">
              <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white border-bottom-0 fw-bold small text-uppercase text-muted pt-3">
-                   1.2 Metode Pembayaran
+                   Metode Pembayaran
                 </div>
                 <div class="card-body p-0">
                    <table class="table table-sm table-striped mb-0 small" id="tabel-metode-bayar">
