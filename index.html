@@ -903,42 +903,49 @@
             <div id="tab-kasbon" class="tab-content-item d-none">
               <div class="row g-4">
                 <div class="col-md-4">
-                  <div class="card bg-warning-subtle border-0 p-3 h-100 shadow-sm">
-                    <h6 class="fw-bold text-dark border-bottom border-dark pb-2 mb-3">
-                        <i class="material-icons align-middle me-1">edit</i> Form Kasbon
-                    </h6>
-                    
-                    <div class="mb-2">
-                        <label class="small fw-bold">Pilih Karyawan</label>
-                        <select id="kasbon-nama" class="form-select bg-white border-0 shadow-sm"></select>
-                    </div>
-                    
-                    <div class="mb-2">
-                        <label class="small fw-bold">Nominal Pinjaman</label>
-                        <div class="input-group shadow-sm">
-                            <span class="input-group-text bg-white border-0">Rp</span>
-                            <input type="text" id="kasbon-nominal" class="form-control border-0" placeholder="0" onkeyup="formatRupiahInput(this); hitungCicilan()">
-                        </div>
-                    </div>
+<div class="card bg-warning-subtle border-0 p-3 h-100 shadow-sm">
+    <h6 class="fw-bold text-dark border-bottom border-dark pb-2 mb-3">
+        <i class="material-icons align-middle me-1">edit</i> Form Kasbon
+    </h6>
+    
+    <div class="mb-2">
+        <label class="small fw-bold">Pilih Karyawan</label>
+        <select id="kasbon-nama" class="form-select bg-white border-0 shadow-sm"></select>
+    </div>
+    
+    <div class="mb-2">
+        <label class="small fw-bold">Nominal Pinjaman</label>
+        <div class="input-group shadow-sm">
+            <span class="input-group-text bg-white border-0">Rp</span>
+            <input type="text" id="kasbon-nominal" class="form-control border-0" placeholder="0" onkeyup="formatRupiahInput(this); hitungCicilan()">
+        </div>
+    </div>
 
-                    <div class="row mb-2">
-                        <div class="col-6">
-                            <label class="small fw-bold">Tenor (Bulan)</label>
-                            <input type="number" id="kasbon-tenor" class="form-control border-0 shadow-sm text-center" value="1" min="1" onchange="hitungCicilan()" onkeyup="hitungCicilan()">
-                        </div>
-                        <div class="col-6">
-                            <label class="small fw-bold text-muted">Angsuran/bln</label>
-                            <input type="text" id="kasbon-estimasi" class="form-control border-0 bg-transparent fw-bold text-primary text-end p-0" value="Rp 0" readonly>
-                        </div>
-                    </div>
+    <div class="mb-2">
+        <label class="small fw-bold text-danger">Sumber Dana (Akun Saldo)</label>
+        <select id="kasbon-akun" class="form-select bg-white border-0 shadow-sm text-danger fw-bold">
+            <option value="">-- Pilih Akun --</option>
+        </select>
+        <small class="text-muted" style="font-size:10px">*Saldo akun ini akan berkurang.</small>
+    </div>
+    <div class="row mb-2">
+        <div class="col-6">
+            <label class="small fw-bold">Tenor (Bulan)</label>
+            <input type="number" id="kasbon-tenor" class="form-control border-0 shadow-sm text-center" value="1" min="1" onchange="hitungCicilan()" onkeyup="hitungCicilan()">
+        </div>
+        <div class="col-6">
+            <label class="small fw-bold text-muted">Angsuran/bln</label>
+            <input type="text" id="kasbon-estimasi" class="form-control border-0 bg-transparent fw-bold text-primary text-end p-0" value="Rp 0" readonly>
+        </div>
+    </div>
 
-                    <div class="mb-3">
-                        <label class="small fw-bold">Keterangan</label>
-                        <textarea id="kasbon-ket" class="form-control border-0 shadow-sm" rows="2" placeholder="Keperluan..."></textarea>
-                    </div>
-                    
-                    <button onclick="simpanKasbon()" class="btn btn-dark w-100 fw-bold rounded-pill shadow">SIMPAN PENGAJUAN</button>
-                  </div>
+    <div class="mb-3">
+        <label class="small fw-bold">Keterangan</label>
+        <textarea id="kasbon-ket" class="form-control border-0 shadow-sm" rows="2" placeholder="Keperluan..."></textarea>
+    </div>
+    
+    <button onclick="simpanKasbon()" class="btn btn-dark w-100 fw-bold rounded-pill shadow">SIMPAN PENGAJUAN</button>
+</div>
                 </div>
 
                 <div class="col-md-8">
