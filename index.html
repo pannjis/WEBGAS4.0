@@ -925,13 +925,169 @@
           </div>
         </div>
 
-        <div id="page-laporan" class="page-section d-none">
-          <h3 class="page-title">Laporan Profit</h3>
-          <div class="card p-5 text-center">
-            <h1 class="text-success display-3 fw-bold" id="lap-net">Rp 0</h1>
-            <p class="text-muted">Total Keuntungan Bersih (All Time)</p>
+<div id="page-laporan" class="page-section d-none">
+  
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+      <h3 class="page-title mb-1">Laporan Keuangan</h3>
+      <small class="text-muted">Analisa performa bisnis dan arus kas Anda.</small>
+    </div>
+    
+    <div class="d-flex gap-2 bg-white p-2 rounded shadow-sm">
+       <select class="form-select form-select-sm fw-bold border-0 bg-light" style="width: 130px;" onchange="setFilterLaporan(this.value)">
+          <option value="hari_ini">Hari Ini</option>
+          <option value="kemarin">Kemarin</option>
+          <option value="7_hari">7 Hari Terakhir</option>
+          <option value="bulan_ini" selected>Bulan Ini</option>
+          <option value="bulan_lalu">Bulan Lalu</option>
+       </select>
+       
+       <input type="date" id="lap-start" class="form-control form-control-sm border-0 bg-light" style="width: 110px;" onchange="loadLaporanUtama()">
+       <span class="align-self-center text-muted">-</span>
+       <input type="date" id="lap-end" class="form-control form-control-sm border-0 bg-light" style="width: 110px;" onchange="loadLaporanUtama()">
+       
+       <div class="vr mx-1"></div>
+       <button class="btn btn-sm btn-success rounded" onclick="exportLaporanExcel()" title="Export Excel"><i class="material-icons" style="font-size:16px">table_view</i></button>
+       <button class="btn btn-sm btn-danger rounded" onclick="printLaporanPDFCurrent()" title="Export PDF"><i class="material-icons" style="font-size:16px">picture_as_pdf</i></button>
+    </div>
+  </div>
+
+  <ul class="nav nav-pills mb-4 gap-2" id="laporanTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active fw-bold rounded-pill px-4" id="tab-laba-btn" data-bs-toggle="pill" data-bs-target="#tab-laba" type="button" role="tab">
+        <i class="material-icons align-middle me-1" style="font-size:18px">analytics</i> Laporan Penjualan & Laba
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link fw-bold rounded-pill px-4" id="tab-beban-btn" data-bs-toggle="pill" data-bs-target="#tab-beban" type="button" role="tab">
+        <i class="material-icons align-middle me-1" style="font-size:18px">receipt_long</i> Laporan Pengeluaran
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="laporanTabsContent">
+    
+    <div class="tab-pane fade show active" id="tab-laba" role="tabpanel">
+      
+      <div class="row g-3 mb-4">
+         <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
+               <div class="card-body">
+                  <small class="text-uppercase fw-bold text-muted letter-spacing-1">A. Pendapatan (Omzet)</small>
+                  <h4 class="fw-bold text-success mt-2 mb-0" id="lap-pendapatan">Rp 0</h4>
+               </div>
+            </div>
+         </div>
+         <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+               <div class="card-body">
+                  <small class="text-uppercase fw-bold text-muted letter-spacing-1">B. Harga Pokok (HPP)</small>
+                  <h4 class="fw-bold text-warning mt-2 mb-0" id="lap-hpp">Rp 0</h4>
+               </div>
+            </div>
+         </div>
+         <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 bg-success-subtle">
+               <div class="card-body">
+                  <small class="text-uppercase fw-bold text-success-emphasis letter-spacing-1">C. Laba Kotor (A-B)</small>
+                  <h4 class="fw-bold text-success-emphasis mt-2 mb-0" id="lap-kotor">Rp 0</h4>
+               </div>
+            </div>
+         </div>
+         <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger">
+               <div class="card-body">
+                  <small class="text-uppercase fw-bold text-muted letter-spacing-1">D. Pengeluaran Ops.</small>
+                  <h4 class="fw-bold text-danger mt-2 mb-0" id="lap-beban">Rp 0</h4>
+               </div>
+            </div>
+         </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+         <div class="col-md-6">
+            <div class="card border-0 shadow-lg text-white bg-primary h-100 overflow-hidden position-relative">
+               <div class="card-body p-4 position-relative" style="z-index:1;">
+                  <h6 class="text-uppercase text-white-50 fw-bold mb-1">G. Laba Bersih (Net Profit)</h6>
+                  <h1 class="display-4 fw-bold mb-0" id="lap-bersih">Rp 0</h1>
+                  <small class="text-white-50">(Laba Kotor - Pengeluaran)</small>
+               </div>
+               <i class="material-icons position-absolute text-white opacity-10" style="font-size:150px; right: -20px; bottom: -40px;">monetization_on</i>
+            </div>
+         </div>
+
+         <div class="col-md-3">
+             <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-center">
+                   <div class="mb-3">
+                      <small class="text-uppercase fw-bold text-muted">E. Total Aset Stok</small>
+                      <h5 class="fw-bold text-dark m-0" id="lap-stok">Rp 0</h5>
+                   </div>
+                   <div class="border-top pt-3">
+                      <small class="text-uppercase fw-bold text-muted">F. Pembelian Stok (Periode Ini)</small>
+                      <h5 class="fw-bold text-dark m-0" id="lap-beli">Rp 0</h5>
+                   </div>
+                </div>
+             </div>
+         </div>
+         
+         <div class="col-md-3">
+             <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-bottom-0 fw-bold small text-uppercase text-muted pt-3">
+                   1.2 Metode Pembayaran
+                </div>
+                <div class="card-body p-0">
+                   <table class="table table-sm table-striped mb-0 small" id="tabel-metode-bayar">
+                      <tbody>
+                         </tbody>
+                   </table>
+                </div>
+             </div>
+         </div>
+      </div>
+
+    </div>
+
+    <div class="tab-pane fade" id="tab-beban" role="tabpanel">
+       
+       <div class="row mb-3">
+          <div class="col-md-4">
+             <div class="card bg-danger text-white border-0 shadow-sm">
+                <div class="card-body p-3 d-flex align-items-center justify-content-between">
+                   <div>
+                      <small class="text-uppercase fw-bold text-white-50">A. Total Pengeluaran</small>
+                      <h3 class="fw-bold m-0" id="lap-beban-total">Rp 0</h3>
+                   </div>
+                   <i class="material-icons opacity-25 fs-1">money_off</i>
+                </div>
+             </div>
           </div>
-        </div>
+       </div>
+
+       <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white py-3">
+             <h6 class="m-0 fw-bold">B. Rincian Transaksi Pengeluaran</h6>
+          </div>
+          <div class="table-responsive">
+             <table class="table table-hover table-striped mb-0 align-middle" id="tabel-det-pengeluaran">
+                <thead class="bg-light">
+                   <tr>
+                      <th>No Transaksi</th>
+                      <th>Tanggal</th>
+                      <th>Kategori</th>
+                      <th>Keterangan</th>
+                      <th class="text-end">Jumlah</th>
+                   </tr>
+                </thead>
+                <tbody>
+                   </tbody>
+             </table>
+          </div>
+       </div>
+    </div>
+
+  </div>
+</div>
 
         <div id="page-pengaturan" class="page-section d-none">
           <h3 class="page-title mb-4">Pengaturan & Akun</h3>
