@@ -1,4 +1,6 @@
 <script>
+  let salesChartInstance = null;
+  let pieChartInstance = null;
   let currentUser = {};
   let globalCompanyProfile = {};
   let globalListPelanggan = [];
@@ -742,24 +744,183 @@ function prosesGantiPassword() {
 }
 
 
-function loadDashboard() {
-  // loading(true); // Opsional: Matikan loading disini jika mengganggu flow awal
-  google.script.run.withSuccessHandler(s => {
-    loading(false);
+function loadDashboard(startDate = null, endDate = null) {
+  // Loading state
+  const incomeEl = document.getElementById('dash-main-income');
+  if(incomeEl) incomeEl.innerText = 'Loading...';
+  
+  google.script.run.withSuccessHandler(res => {
+    const stats = res.stats;
+    const accounts = res.accounts;
+
+    // 1. UPDATE INFO PERIODE
+    document.getElementById('dash-periode-info').innerText = `Periode: ${res.periode}`;
     
-    // Cek dulu apakah elemennya ada sebelum diisi (Safety Check)
-    if(document.getElementById('dash-income')) {
-        document.getElementById('dash-income').innerText = rupiah(s.income);
-    }
-    if(document.getElementById('dash-expense')) {
-        document.getElementById('dash-expense').innerText = rupiah(s.expense);
-    }
-    if(document.getElementById('dash-net')) {
-        document.getElementById('dash-net').innerText = rupiah(s.net);
+    // 2. UPDATE NILAI KARTU
+    document.getElementById('dash-main-income').innerText = rupiah(stats.pendapatan);
+    document.getElementById('dash-avg-trx').innerText = `Rata-rata: ${rupiah(stats.rataRataTransaksi)} / trx`;
+    
+    document.getElementById('dash-main-expense').innerText = rupiah(stats.pengeluaran);
+    document.getElementById('dash-retur').innerText = `Retur: ${rupiah(stats.retur)}`;
+    
+    document.getElementById('dash-count-order').innerText = stats.pesanan;
+    document.getElementById('dash-count-pel').innerText = `${stats.totalPelanggan} Pelanggan`;
+    
+    document.getElementById('dash-count-refill').innerText = stats.qtyRefill + " Pcs";
+
+    // 3. RENDER DOMPET (Sama seperti sebelumnya)
+    const walletContainer = document.getElementById('container-wallets');
+    if(walletContainer) {
+        walletContainer.innerHTML = '';
+        accounts.forEach(acc => {
+           let colorClass = 'text-dark';
+           let borderClass = 'border-secondary';
+           if(acc.nama.toLowerCase().includes('bca')) { colorClass='text-primary'; borderClass='border-primary'; }
+           if(acc.nama.toLowerCase().includes('tunai')) { colorClass='text-success'; borderClass='border-success'; }
+           
+           walletContainer.innerHTML += `
+           <div class="card p-3 shadow-sm border-0 border-start border-4 ${borderClass} d-inline-block align-top" style="min-width: 200px; margin-right: 10px;">
+               <small class="text-muted text-uppercase fw-bold" style="font-size:10px">${acc.tipe}</small>
+               <h6 class="fw-bold text-dark mb-0 text-truncate">${acc.nama}</h6>
+               <h5 class="fw-bold ${colorClass} mt-2 mb-0">${rupiah(acc.saldo)}</h5>
+           </div>`;
+        });
     }
 
-    // Baris 'lap-net' SUDAH DIHAPUS agar tidak error
-  }).getDashboardStats();
+    // 4. RENDER TABEL PRODUK
+    const prodTable = document.getElementById('tabel-top-produk');
+    if(prodTable) {
+        prodTable.innerHTML = '';
+        const sortedProduk = Object.entries(stats.produkTerjual).sort(([,a],[,b]) => b - a);
+        if(sortedProduk.length === 0) {
+            prodTable.innerHTML = '<tr><td class="text-center text-muted">Tidak ada data.</td></tr>';
+        } else {
+            sortedProduk.forEach(([nama, qty]) => {
+                prodTable.innerHTML += `
+                <tr>
+                    <td class="ps-3"><span class="fw-bold text-dark" style="font-size:13px">${nama}</span></td>
+                    <td class="text-end pe-3"><span class="badge bg-light text-dark border fw-bold">${qty}</span></td>
+                </tr>`;
+            });
+        }
+    }
+
+    // 5. RENDER CHART
+    renderCharts(stats); // Panggil fungsi renderCharts yg sudah dibuat sebelumnya
+
+  }).getDashboardRealtime(startDate, endDate);
+}
+
+// --- FUNGSI BARU UNTUK TOMBOL FILTER ---
+
+function applyDashboardFilter() {
+    const start = document.getElementById('dash-date-start').value;
+    const end = document.getElementById('dash-date-end').value;
+    
+    if(!start || !end) {
+        Swal.fire('Error', 'Harap pilih tanggal awal dan akhir', 'warning');
+        return;
+    }
+    
+    loadDashboard(start, end);
+}
+
+function resetDashboardFilter() {
+    // Reset input tanggal
+    document.getElementById('dash-date-start').value = '';
+    document.getElementById('dash-date-end').value = '';
+    
+    // Load default (Bulan Ini)
+    loadDashboard(); 
+}
+
+// Inisialisasi awal saat halaman dibuka
+document.addEventListener('DOMContentLoaded', function() {
+    // ... init lainnya ...
+    // loadDashboard(); // Pastikan dipanggil di init utama
+});
+
+// FUNGSI RENDER CHART (BARU)
+function renderCharts(stats) {
+    // 1. HAPUS CHART LAMA JIKA ADA (Agar tidak numpuk saat refresh)
+    if(salesChartInstance) salesChartInstance.destroy();
+    if(pieChartInstance) pieChartInstance.destroy();
+
+    // 2. CHART PENJUALAN HARIAN (Line Chart)
+    const ctxSales = document.getElementById('chartSales').getContext('2d');
+    
+    // Bikin Gradient Warna Merah
+    let gradient = ctxSales.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(255, 59, 48, 0.5)');   
+    gradient.addColorStop(1, 'rgba(255, 59, 48, 0.0)');
+
+    salesChartInstance = new Chart(ctxSales, {
+        type: 'line',
+        data: {
+            labels: stats.chartLabels, // Tanggal 1, 2, 3...
+            datasets: [
+                {
+                    label: 'Pemasukan (Omzet)',
+                    data: stats.chartSales,
+                    borderColor: '#ff3b30', // Merah Primary
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#ff3b30',
+                    fill: true,
+                    tension: 0.4 // Garis lengkung halus
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { borderDash: [2, 4] }
+                },
+                x: {
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+
+    // 3. CHART PIE (PEMASUKAN vs PENGELUARAN)
+    // Atau bisa juga Laba Bersih vs Beban
+    const ctxPie = document.getElementById('chartPie').getContext('2d');
+    
+    let profit = stats.pendapatanBulanIni - stats.pengeluaranBulanIni;
+    if(profit < 0) profit = 0; // Biar chart ga error
+
+    pieChartInstance = new Chart(ctxPie, {
+        type: 'doughnut',
+        data: {
+            labels: ['Pengeluaran', 'Laba Bersih'],
+            datasets: [{
+                data: [stats.pengeluaranBulanIni, profit],
+                backgroundColor: [
+                    '#dc3545', // Merah (Expense)
+                    '#198754'  // Hijau (Profit)
+                ],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%', // Bolong tengah
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
 }
 
   // --- PRODUK & KASIR ---
