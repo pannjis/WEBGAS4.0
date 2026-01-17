@@ -1292,6 +1292,11 @@
                                   <label class="small fw-bold">Email (Aktif)</label>
                                   <input type="email" id="kry-email" class="form-control" placeholder="email@contoh.com">
                                 </div>
+                                <div class="col-md-6">
+                                <label class="small fw-bold text-danger">Tanggal Masuk Kerja</label>
+                                <input type="date" id="kry-tgl-masuk" class="form-control" placeholder="Wajib diisi untuk pro-rata">
+                                <small class="text-muted" style="font-size:10px">*Digunakan untuk hitung gaji pro-rata bulan pertama.</small>
+                              </div>
                             </div>
                         </div>
                     </div>
@@ -1312,7 +1317,7 @@
                         </div>
                         <div class="col-md-8">
                           <label class="small fw-bold">Nomor Identitas</label>
-                          <input type="number" id="kry-no-id" class="form-control fw-bold" placeholder="Nomor NIK / SIM">
+                          <input type="text" id="kry-no-id" class="form-control fw-bold" placeholder="Nomor NIK / SIM" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                         </div>
                         <div class="col-12">
                           <label class="small fw-bold">Alamat Sesuai KTP</label>
@@ -1337,7 +1342,7 @@
                           </div>
                           <div class="mb-2">
                               <label class="small fw-bold">Nomor Telepon</label>
-                              <input type="number" id="kry-darurat-telp" class="form-control" placeholder="08xxx">
+                              <input type="text" id="kry-darurat-telp" class="form-control" placeholder="08xxx" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                           </div>
                         </div>
                     </div>
@@ -1843,8 +1848,8 @@
         <h6 class="small fw-bold text-muted border-bottom pb-1">A. PENDAPATAN</h6>
         <div class="row g-2 mb-2">
             <div class="col-6">
-                <label class="small text-muted">Gaji Pokok</label>
-                <input type="text" id="ver-gaji" class="form-control fw-bold" readonly>
+                <label class="small text-muted">Gaji Pokok (Bisa Diedit)</label>
+                <input type="text" id="ver-gaji" class="form-control fw-bold" onkeyup="formatRupiahInput(this); hitungTotalModal()">
             </div>
             <div class="col-6">
                 <label class="small text-muted">Bonus / Tunjangan</label>
