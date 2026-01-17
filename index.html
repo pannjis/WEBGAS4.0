@@ -1046,6 +1046,11 @@
         <i class="material-icons align-middle me-1" style="font-size:18px">receipt_long</i> Laporan Pengeluaran
       </button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link fw-bold rounded-pill px-4" id="tab-saldo-btn" data-bs-toggle="pill" data-bs-target="#tab-saldo" type="button" role="tab" onclick="loadLaporanSaldo()">
+        <i class="material-icons align-middle me-1" style="font-size:18px">account_balance_wallet</i> Saldo Akun & Dompet
+      </button>
+    </li>
   </ul>
 
   <div class="tab-content" id="laporanTabsContent">
@@ -1168,6 +1173,45 @@
           </div>
        </div>
     </div>
+    <div class="tab-pane fade" id="tab-saldo" role="tabpanel">
+   
+   <div class="alert alert-info border-0 d-flex align-items-center shadow-sm mb-4">
+       <i class="material-icons me-3 fs-1">account_balance</i>
+       <div>
+           <h6 class="fw-bold m-0">Posisi Keuangan Realtime</h6>
+           <small>Menampilkan sisa saldo pada setiap akun kas, bank, dan dompet digital berdasarkan seluruh transaksi yang tercatat.</small>
+       </div>
+   </div>
+
+   <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+         <h6 class="m-0 fw-bold text-dark">Rincian Saldo</h6>
+         <button class="btn btn-sm btn-light rounded-pill border shadow-sm" onclick="loadLaporanSaldo()" title="Refresh Data">
+            <i class="material-icons align-middle spin-hover text-primary">refresh</i>
+         </button>
+      </div>
+      <div class="table-responsive">
+         <table class="table table-hover align-middle mb-0" id="tabel-lap-saldo">
+            <thead class="bg-light">
+               <tr>
+                  <th style="width: 35%;">Nama Akun</th>
+                  <th style="width: 25%;">No. Rekening</th>
+                  <th style="width: 15%;">Tipe</th>
+                  <th class="text-end" style="width: 25%;">Sisa Saldo</th>
+               </tr>
+            </thead>
+            <tbody>
+                </tbody>
+            <tfoot class="bg-light">
+                <tr>
+                    <td colspan="3" class="text-end fw-bold pt-3">TOTAL ASET KEUANGAN</td>
+                    <td class="text-end fw-bold text-primary fs-5 pt-3" id="total-saldo-all">Rp 0</td>
+                </tr>
+            </tfoot>
+         </table>
+      </div>
+   </div>
+</div>
 
   </div>
 </div>
@@ -2010,66 +2054,83 @@
     </div>
   </div>
 
-        <div class="modal fade" id="modalDetailKasbon" tabindex="-1">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header bg-warning-subtle text-dark">
-              <h5 class="fw-bold modal-title">Detail Kasbon & Pembayaran</h5>
-              <button class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-              <input type="hidden" id="det-kasbon-id">
-              
-              <div class="card bg-light border-0 p-3 mb-3">
-                  <h6 class="fw-bold" id="det-kasbon-nama">Nama Karyawan</h6>
-                  <div class="d-flex justify-content-between mt-2">
-                      <small class="text-muted">Total Pinjaman:</small>
-                      <strong id="det-kasbon-total">Rp 0</strong>
-                  </div>
-                  <div class="d-flex justify-content-between">
-                      <small class="text-muted">Sudah Dibayar:</small>
-                      <strong class="text-success" id="det-kasbon-sudah">Rp 0</strong>
-                  </div>
-                  <div class="border-top my-2"></div>
-                  <div class="d-flex justify-content-between">
-                      <small class="text-muted fw-bold">SISA HUTANG:</small>
-                      <strong class="text-danger fs-5" id="det-kasbon-sisa">Rp 0</strong>
-                  </div>
-              </div>
-
-              <div class="mb-3" id="form-bayar-manual-area">
-                  <label class="small fw-bold mb-1">Bayar Cicilan Manual</label>
-                  
-                  <select id="input-bayar-akun" class="form-select mb-2 fw-bold text-dark border-secondary">
-                      <option value="">Memuat Akun...</option>
-                  </select>
-
-                  <div class="input-group">
-                      <span class="input-group-text bg-white">Rp</span>
-                      <input type="text" id="input-bayar-cicilan" class="form-control" placeholder="Nominal Bayar" onkeyup="formatRupiahInput(this)">
-                      <button class="btn btn-success fw-bold" onclick="prosesBayarCicilanManual()">BAYAR</button>
-                  </div>
-                  <small class="text-muted" style="font-size:10px">*Pembayaran akan masuk ke Akun yang dipilih & mengurangi hutang.</small>
-              </div>
-
-              <h6 class="fw-bold border-bottom pb-2 mt-4">Riwayat Pembayaran</h6>
-              <div class="table-responsive" style="max-height: 200px; overflow-y:auto;">
-              <table class="table table-sm table-striped small align-middle" id="tabel-history-cicilan">
-                  <thead>
-                      <tr>
-                          <th>Tanggal</th>
-                          <th>Metode & Ket</th>
-                          <th class="text-end">Jumlah</th>
-                          <th class="text-center" style="width: 50px;">Aksi</th> </tr>
-                  </thead>
-                  <tbody></tbody>
-              </table>
-          </div>
-
-            </div>
-          </div>
-        </div>
+<div class="modal fade" id="modalDetailKasbon" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title fw-bold">
+            <i class="material-icons align-middle me-2">history_edu</i>Rincian Kasbon
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
+
+      <div class="modal-body p-4">
+        <input type="hidden" id="det-kasbon-id">
+        
+        <div class="text-center mb-4">
+            <h4 class="fw-bold mb-0" id="det-kasbon-nama">Nama Karyawan</h4>
+            <div class="text-muted small">Total Pinjaman: <span id="det-kasbon-total">Rp 0</span></div>
+        </div>
+
+        <div class="row g-2 mb-4">
+            <div class="col-6">
+                <div class="p-2 border rounded bg-light text-center">
+                    <small class="text-muted d-block" style="font-size:10px">SUDAH BAYAR</small>
+                    <div class="fw-bold text-success" id="det-kasbon-sudah">Rp 0</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="p-2 border rounded bg-light text-center">
+                    <small class="text-muted d-block" style="font-size:10px">SISA HUTANG</small>
+                    <div class="fw-bold text-danger" id="det-kasbon-sisa">Rp 0</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="form-bayar-manual-area" class="bg-primary-subtle p-3 rounded-3 mb-4 border border-primary-subtle">
+            <h6 class="fw-bold text-primary mb-3"><i class="material-icons align-middle me-1">payments</i>Terima Pembayaran Cicilan</h6>
+            
+            <div class="mb-2">
+                <label class="form-label small fw-bold text-dark">Masuk ke Akun Mana?</label>
+                <select class="form-select form-select-sm" id="input-bayar-akun">
+                    <option value="">Memuat Akun...</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-bold text-dark">Nominal Pembayaran</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text fw-bold">Rp</span>
+                    <input type="text" class="form-control fw-bold" id="input-bayar-cicilan" placeholder="0" onkeyup="formatRupiahInput(this)">
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-sm w-100 fw-bold rounded-pill shadow-sm" onclick="prosesBayarCicilanManual()">
+                SIMPAN PEMBAYARAN
+            </button>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+            <h6 class="fw-bold m-0">Riwayat Pembayaran</h6>
+            <button id="btn-cetak-rekap" class="btn btn-sm btn-dark rounded-pill px-3" disabled>
+                <i class="material-icons align-middle" style="font-size:12px">print</i> Rekap
+            </button>
+        </div>
+        
+        <div class="table-responsive" style="max-height: 200px;">
+            <table class="table table-sm table-hover mb-0" id="tabel-history-cicilan" style="font-size:12px">
+                <thead class="table-light">
+                    <tr><th>Tanggal</th><th>Ket</th><th class="text-end">Jumlah</th><th>Aksi</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
 
       <div class="modal fade" id="modalDetailGaji" tabindex="-1" data-bs-backdrop="static">
   <div class="modal-dialog">
@@ -2133,6 +2194,66 @@
         <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Tutup</button>
         <button type="button" class="btn btn-success rounded-pill fw-bold px-4" onclick="simpanVerifikasiKaryawan()">
             <i class="material-icons align-middle me-1">check_circle</i> SESUAI
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalCairkanGaji" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg overflow-hidden">
+      
+      <div class="modal-header bg-success-subtle border-0 d-flex flex-column align-items-center py-4">
+        <div class="bg-white p-3 rounded-circle shadow-sm mb-3">
+            <i class="material-icons text-success fs-1">payments</i>
+        </div>
+        <h5 class="modal-title fw-bold text-success-emphasis mb-1">Konfirmasi Pembayaran</h5>
+        <small class="text-muted" id="cair-gaji-periode-lbl">Periode: -</small>
+        <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body p-4">
+        <input type="hidden" id="cair-gaji-periode">
+
+        <div class="row g-3 mb-4">
+            <div class="col-6">
+                <div class="p-3 border rounded-3 text-center bg-light h-100">
+                    <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">Penerima</small>
+                    <div class="fw-bold text-dark fs-5 mt-1" id="cair-gaji-count">0 Org</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="p-3 border rounded-3 text-center bg-light h-100">
+                    <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">Total Gaji</small>
+                    <div class="fw-bold text-dark fs-5 mt-1" id="cair-gaji-total-sm">0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <label class="form-label fw-bold text-dark small">SUMBER DANA (AKUN)</label>
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0"><i class="material-icons text-muted">account_balance_wallet</i></span>
+                <select class="form-select form-select-lg border-start-0 ps-0 fw-bold text-dark" id="cair-gaji-akun" style="font-size: 14px;">
+                    <option value="">Memuat Akun...</option>
+                </select>
+            </div>
+            <div class="form-text text-end mt-2" id="info-saldo-akun">
+                <small class="text-muted">Pilih akun untuk melihat sisa saldo</small>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center border-top pt-3">
+            <span class="text-muted fw-bold">Total Pembayaran</span>
+            <span class="fs-4 fw-bold text-success" id="cair-gaji-total-big">Rp 0</span>
+        </div>
+      </div>
+
+      <div class="modal-footer border-0 bg-light p-3">
+        <button type="button" class="btn btn-link text-muted text-decoration-none fw-bold me-auto" data-bs-dismiss="modal">Batal</button>
+        <button type="button" id="btn-submit-cair" class="btn btn-success rounded-pill fw-bold px-5 py-2 shadow-sm" onclick="submitCairkanGaji()">
+           BAYAR SEKARANG <i class="material-icons align-middle ms-1" style="font-size:16px">arrow_forward</i>
         </button>
       </div>
     </div>
