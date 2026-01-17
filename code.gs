@@ -24,7 +24,7 @@ function setupDatabase() {
     {name: 'KATEGORI', header: ['Nama_Kategori']},
     {name: 'KARYAWAN', header: ['ID', 'Nama_Lengkap', 'Tempat_Lahir', 'Tanggal_Lahir', 'Jenis_Kelamin', 
     'No_Identitas', 'Tipe_Identitas', 'Email', 'Alamat_KTP', 'Alamat_Domisili',
-    'Nama_Darurat', 'Telp_Darurat', 'Gaji_Pokok', 'Bonus', 'Foto_Url', 'Status'
+    'Nama_Darurat', 'Telp_Darurat', 'Gaji_Pokok', 'Bonus', 'Foto_Url', 'Status', 'Tanggal_Masuk'
     ]}, 
     {name: 'RIWAYAT_GAJI', header: ['ID_Gaji', 'Periode', 'Tanggal_Generate', 'Nama_Karyawan', 'Gaji_Pokok', 'Bonus', 'Potongan_Kasbon', 'Total_THP', 'Status']}, 
     {name: 'KASBON', header: ['ID_Kasbon', 'Tanggal', 'Nama_Karyawan', 'Nominal', 'Keterangan', 'Status_Lunas', 'Sudah_Bayar', 'Tenor', 'Angsuran_Per_Bulan']},
@@ -243,35 +243,33 @@ function simpanProfilPerusahaan(form) {
   return "Profil & Logo Berhasil Disimpan!";
 }
 
-// GANTI function getData(sheetName) yang lama dengan ini:
-
-// [FIX TOTAL] Fungsi Baca Data yang Aman dari Error Null/Kosong
+// [FIX TOTAL] Fungsi Baca Data yang Aman dari Error Timezone
 function getData(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(sheetName);
   
-  // 1. Cek Apakah Sheet Ada? Jika tidak, kembalikan array kosong
+  // 1. Cek Apakah Sheet Ada?
   if (!sheet) return [];
-  
+
   // 2. Ambil Range Data
   const range = sheet.getDataRange();
   const values = range.getValues();
   
-  // 3. Cek Apakah Data Kosong? (Hanya header atau benar-benar kosong)
+  // 3. Cek Apakah Data Kosong?
   if (!values || values.length <= 1) return [];
-  
-  // 4. Ambil data mulai baris ke-2 (Index 1) untuk membuang Header
+
+  // 4. Ambil Timezone Spreadsheet (Biar sinkron sama settingan Google Sheet Bapak)
+  const timeZone = ss.getSpreadsheetTimeZone();
+
+  // 5. Filter baris kosong & Format Tanggal Jadi String Mati (ISO tanpa Z)
   const data = values.slice(1);
-  
-  // 5. Filter baris kosong & Format Tanggal (Hanya jika benar-benar Tanggal)
   return data.filter(r => r[0] !== "").map(r => {
-      // Kita iterasi setiap sel untuk mencari yang bertipe Tanggal
       return r.map(cell => {
           if (cell instanceof Date) {
-              // Koreksi Timezone Asia/Jakarta agar tidak mundur sehari
-              // +7 Jam = 420 menit. Kita sesuaikan offsetnya.
-              let localDate = new Date(cell.getTime() - (cell.getTimezoneOffset() * 60000));
-              return localDate.toISOString(); 
+              // UBAHAN UTAMA DISINI:
+              // Kita format jadi "YYYY-MM-DDTHH:mm:ss" (Tanpa huruf 'Z' di belakang)
+              // Ini memaksa browser menganggap "Ini adalah waktu lokal", jangan ditambah jam lagi.
+              return Utilities.formatDate(cell, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
           }
           return cell;
       });
@@ -1065,26 +1063,24 @@ function simpanKaryawan(form) {
   }
 
   // 2. Siapkan Data Baris
-  // Urutan: ID, Nama, TmpLahir, TglLahir, Gender, NoID, TipeID, Email, AlmKTP, AlmDom, DaruratNama, DaruratTelp, Gaji, Bonus, Foto, Status
-  const rowData = [
+    const rowData = [
     form.nama, form.tmpLahir, form.tglLahir, form.gender, 
-    form.noId, form.tipeId, form.email, form.alamatKtp, form.alamatDom,
-    form.daruratNama, form.daruratTelp, form.gaji, form.bonus, fotoUrl, 'Aktif'
+    "'" + form.noId, form.tipeId, form.email, form.alamatKtp, form.alamatDom, // <-- Fix NIK
+    form.daruratNama, "'" + form.daruratTelp, form.gaji, form.bonus, fotoUrl, 'Aktif', // <-- Fix No HP
+    form.tglMasuk // (Pastikan ini ada jika Bapak sudah menambahkan fitur tanggal masuk sebelumnya)
   ];
-
-  // 3. Simpan ke Database
+  
   if(form.id) { 
     // --- EDIT MODE ---
     for(let i=1; i<data.length; i++) {
       if(data[i][0] == form.id) {
-        // Update kolom ke-2 sampai 15 (Index 1 s/d 14) -> ID & Status tidak diubah
-        // Kita update satu per satu agar aman
-        const range = sheet.getRange(i+1, 2, 1, 14); // Mulai kolom 2, sebanyak 14 kolom
+        // Update kolom ke-2 sampai 17 (Index 1 s/d 16)
+        const range = sheet.getRange(i+1, 2, 1, 16); // Diperlebar jadi 16 kolom
         range.setValues([rowData]);
         return "Data Karyawan Berhasil Diperbarui";
       }
     }
-  } 
+  }
   
   // --- BARU MODE ---
   const newId = 'KRY-' + Date.now();
@@ -1336,64 +1332,102 @@ function getDataKasbonFull() {
   return getData('KASBON');
 }
 
-// [UPDATE SMART] Ambil Riwayat Gaji + Cek Karyawan Baru (Merge)
 function getRiwayatGajiByPeriode(periode) { 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetRiwayat = ss.getSheetByName('RIWAYAT_GAJI');
   
-  // 1. Ambil Data Karyawan Aktif & Hitungan Gaji Terbarunya
-  // Kita manfaatkan fungsi getDataPayroll() yang sudah ada logikanya
-  const dataFresh = getDataPayroll(); 
+  // 1. Ambil Data Karyawan Aktif (Update getDataPayroll agar bawa Tgl Masuk)
+  // Kita update logika manual disini biar aman
+  const sheetKaryawan = ss.getSheetByName('KARYAWAN');
+  const rawKaryawan = sheetKaryawan.getDataRange().getValues().slice(1); // Skip header
   
+  // Ambil Data Kasbon untuk hitung potongan
+  const kasbonData = getData('KASBON'); 
+
+  // Setup Tanggal Periode (Misal: 2026-01)
+  let year = parseInt(periode.split('-')[0]);
+  let month = parseInt(periode.split('-')[1]) - 1; // JS Month 0-11
+  
+  let startMonth = new Date(year, month, 1);
+  let endMonth = new Date(year, month + 1, 0); // Tgl terakhir bulan itu
+  
+  // Hitung Total Hari Kerja Efektif Bulan Ini (Senin-Sabtu)
+  let totalHariKerjaSebulan = hitungHariKerja(startMonth, endMonth);
+
   // 2. Ambil Data Riwayat yang SUDAH Disimpan
   const riwayatRaw = sheetRiwayat ? sheetRiwayat.getDataRange().getDisplayValues() : [];
   let dataSavedMap = {};
-  
-  // Normalisasi Periode Input (misal: "2026-01")
   let targetPeriode = String(periode).trim();
 
-  // Masukkan data riwayat ke dalam Map biar mudah dicari
-  // Kunci pencarian: Nama Karyawan
   for(let i=1; i<riwayatRaw.length; i++) {
-     let rowP = String(riwayatRaw[i][1]).trim(); // Kolom Periode
-     if(rowP === targetPeriode || rowP.includes(targetPeriode)) {
-        let nama = riwayatRaw[i][3]; // Kolom Nama
-        dataSavedMap[nama] = {
+     let rowP = String(riwayatRaw[i][1]).trim();
+     if(rowP === targetPeriode) {
+        dataSavedMap[riwayatRaw[i][3]] = {
            id: riwayatRaw[i][0],
            periode: rowP,
-           tgl: riwayatRaw[i][2],
-           nama: nama,
-           gaji: parseDuit(riwayatRaw[i][4]),
+           nama: riwayatRaw[i][3],
+           gaji: parseDuit(riwayatRaw[i][4]), // Ini gaji yang sudah tersimpan (fix)
            bonus: parseDuit(riwayatRaw[i][5]),
            kasbon: parseDuit(riwayatRaw[i][6]),
            total: parseDuit(riwayatRaw[i][7]),
-           status: riwayatRaw[i][8] // 'Sukses'
+           status: riwayatRaw[i][8]
         };
      }
   }
 
-  // 3. MERGE (GABUNGKAN)
-  // Loop semua karyawan aktif. Jika sudah ada di riwayat, pakai data riwayat.
-  // Jika belum, pakai data fresh (Status: Belum Digaji).
-  
-  let hasilFinal = dataFresh.map(k => {
-      if (dataSavedMap[k.nama]) {
-          // KASUS 1: SUDAH DIGAJI (Pakai Data Riwayat agar nominal tidak berubah)
-          return dataSavedMap[k.nama];
-      } else {
-          // KASUS 2: KARYAWAN BARU / BELUM DIGAJI (Pakai Data Fresh)
-          return {
-             id: 'DRAFT-' + Date.now(),
-             periode: targetPeriode,
-             tgl: '-',
-             nama: k.nama,
-             gaji: k.gaji,
-             bonus: k.bonus,
-             kasbon: k.kasbonPotongan, // Ambil hitungan kasbon sistem
-             total: k.total,
-             status: 'Belum Digaji' // Status Pembeda
-          };
+  // 3. MERGE & HITUNG PRO-RATA
+  let hasilFinal = rawKaryawan.map(k => {
+      let nama = k[1];
+      
+      // Jika sudah ada di riwayat, pakai data riwayat (jangan dihitung ulang)
+      if (dataSavedMap[nama]) {
+          return dataSavedMap[nama];
+      } 
+      
+      // JIKA BELUM DIGAJI -> HITUNG BARU
+      let gajiPokokDB = Number(k[12]) || 0;
+      let bonusDB = Number(k[13]) || 0;
+      let tglMasukDB = k[16]; // Kolom Q (Index 16) - Tanggal Masuk
+      
+      let gajiFinal = gajiPokokDB;
+      
+      // --- LOGIKA PRO-RATA ---
+      if (tglMasukDB instanceof Date) {
+          // Cek apakah masuk di bulan yang sama dengan periode gaji?
+          if (tglMasukDB > startMonth && tglMasukDB <= endMonth) {
+              
+              // Hitung hari kerja dia masuk sampai akhir bulan
+              let hariKerjaDia = hitungHariKerja(tglMasukDB, endMonth);
+              
+              // Rumus: (Hari Kerja Dia / Total Hari Kerja Bulan Ini) * Gaji Pokok
+              let rasio = hariKerjaDia / totalHariKerjaSebulan;
+              gajiFinal = Math.floor(gajiPokokDB * rasio); 
+              
+              // Pembulatan ke ratusan terdekat biar rapi (opsional)
+              gajiFinal = Math.floor(gajiFinal / 100) * 100;
+          }
       }
+      
+      // Hitung Potongan Kasbon (Logic lama)
+      let tagihanKasbon = 0;
+      kasbonData.forEach(ksb => {
+          if(ksb[2] === nama && String(ksb[5]).includes('Belum')) {
+             let sisa = Number(ksb[3]) - (Number(ksb[6]) || 0);
+             let angsuran = Number(ksb[8]) || sisa;
+             tagihanKasbon += Math.min(angsuran, sisa);
+          }
+      });
+
+      return {
+         id: 'DRAFT-' + Date.now(),
+         periode: targetPeriode,
+         nama: nama,
+         gaji: gajiFinal, // <--- Gaji ini sudah Pro-rata Otomatis
+         bonus: bonusDB,
+         kasbon: tagihanKasbon,
+         total: gajiFinal + bonusDB - tagihanKasbon,
+         status: 'Belum Digaji'
+      };
   });
 
   return hasilFinal;
@@ -1406,7 +1440,7 @@ function parseDuit(val) {
    return Number(bersih) || 0;
 }
 
-// [UPDATE FIX] Simpan Gaji Partial (Tidak Hapus Data Teman Lain)
+// [FIX TOTAL] Simpan Gaji Partial (Potongan Kasbon & Saldo Terupdate)
 function simpanGajiBulanan(periode, listGaji) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetRiwayat = ss.getSheetByName('RIWAYAT_GAJI');
@@ -1418,19 +1452,13 @@ function simpanGajiBulanan(periode, listGaji) {
   
   const periodeClean = String(periode).trim();
 
-  // --- 1. HAPUS DATA LAMA (HANYA UNTUK KARYAWAN YANG SEDANG DIPROSES) ---
-  // Agar tidak duplikat, tapi JANGAN hapus punya teman yang sudah lunas sebelumnya.
+  // --- 1. HAPUS DATA LAMA (Agar tidak duplikat saat update) ---
   const dataLama = sheetRiwayat.getDataRange().getDisplayValues();
-  
-  // Kita kumpulkan nama karyawan yang sedang diproses saat ini
   const namaYangDiproses = listGaji.map(x => x.nama);
 
-  // Loop mundur untuk menghapus data lama milik karyawan yang sedang diproses
   for (let i = dataLama.length - 1; i >= 1; i--) {
       let rowPeriode = String(dataLama[i][1]).trim();
       let rowNama = String(dataLama[i][3]).trim();
-
-      // Hapus jika: Periode Sama DAN Namanya ada di list yang sedang diproses
       if (rowPeriode === periodeClean && namaYangDiproses.includes(rowNama)) {
           sheetRiwayat.deleteRow(i + 1);
       }
@@ -1440,42 +1468,65 @@ function simpanGajiBulanan(periode, listGaji) {
   let totalKeluarSesiIni = 0;
 
   listGaji.forEach(k => {
-      // (Logika Kasbon Baru & Potongan Kasbon tetap sama...)
+      // A. Handle Kasbon Baru (Uang Cair Tambahan)
       let nominalKasbonBaru = Number(k.kasbonBaru) || 0;
       if (nominalKasbonBaru > 0) {
-          kasbonSheet.appendRow(['KSB-' + Date.now(), waktu, k.nama, nominalKasbonBaru, k.ketKasbonBaru || '', 'Belum Lunas', 0, 1, nominalKasbonBaru]);
+          kasbonSheet.appendRow(['KSB-' + Date.now(), waktu, k.nama, nominalKasbonBaru, k.ketKasbonBaru || 'Kasbon via Payroll', 'Belum Lunas', 0, 1, nominalKasbonBaru]);
       }
 
-      let bayarBulanIni = Number(k.potonganManual); // Gunakan mapping potonganManual
+      // B. Handle Potongan Kasbon (Bayar Hutang) - [PERBAIKAN DISINI]
+      // Kita panggil 'kasbonPotongan' (sesuai JS), bukan 'potonganManual'
+      let bayarBulanIni = Number(k.kasbonPotongan) || 0; 
+
       if(bayarBulanIni > 0) {
           for(let i=1; i<kasbonData.length; i++) {
+            // Cari karyawan yang punya hutang 'Belum Lunas'
             if(kasbonData[i][2] == k.nama && String(kasbonData[i][5]).includes('Belum') && bayarBulanIni > 0) {
-               let sisa = Number(kasbonData[i][3]) - (Number(kasbonData[i][6]) || 0);
-               let alokasi = Math.min(sisa, bayarBulanIni);
+               let sisaHutangDb = Number(kasbonData[i][3]) - (Number(kasbonData[i][6]) || 0);
+               
+               // Alokasikan pembayaran
+               let alokasi = Math.min(sisaHutangDb, bayarBulanIni);
+               
                let newSudah = (Number(kasbonData[i][6]) || 0) + alokasi;
-            
-               kasbonSheet.getRange(i+1, 7).setValue(newSudah);
-               if(newSudah >= Number(kasbonData[i][3])) kasbonSheet.getRange(i+1, 6).setValue('Lunas');
+               
+               // Update Sheet KASBON
+               kasbonSheet.getRange(i+1, 7).setValue(newSudah); // Update Kolom G (Sudah Bayar)
+               
+               // Cek Lunas?
+               if(newSudah >= Number(kasbonData[i][3])) {
+                   kasbonSheet.getRange(i+1, 6).setValue('Lunas');
+               }
+
+               // Catat History Pembayaran
                sheetKasbonHistory.appendRow(['AUTO-' + Date.now(), kasbonData[i][0], waktu, alokasi, 'Potong Gaji', 'Payroll ' + periode]);
+               
+               // Kurangi jatah bayar (jika punya multiple hutang)
                bayarBulanIni -= alokasi;
             }
           }
       }
 
-      // SIMPAN RIWAYAT
-      let totalPotongan = (Number(k.potonganManual) || 0); // Sederhanakan field
+      // C. Simpan ke RIWAYAT GAJI
+      // Total Potongan = Cicilan Kasbon + Potongan Lain-lain
+      let potonganLain = Number(k.potonganLain) || 0;
+      let totalPotonganDicatat = (Number(k.kasbonPotongan) || 0) + potonganLain;
+
       sheetRiwayat.appendRow([
           'PAY-' + Date.now(), 
           periodeClean, 
-          waktu, k.nama, k.gaji, 
+          waktu, 
+          k.nama, 
+          k.gaji, 
           Number(k.bonus) + nominalKasbonBaru, 
-          totalPotongan, k.total, 'Sukses'
+          totalPotonganDicatat, // Kolom G (Potongan) sekarang sudah benar
+          k.total, 
+          'Sukses'
       ]);
+      
       totalKeluarSesiIni += Number(k.total);
   });
 
-  // --- 3. KEUANGAN (CATAT PENGELUARAN TAMBAHAN) ---
-  // Catat pengeluaran hanya sebesar total yang dicairkan sesi ini
+  // --- 3. KEUANGAN (CATAT PENGELUARAN UANG REAL) ---
   if(totalKeluarSesiIni > 0) {
      keuSheet.appendRow([
          'PAYROLL-' + Date.now(), 
@@ -1483,11 +1534,27 @@ function simpanGajiBulanan(periode, listGaji) {
          'Pengeluaran', 
          'Gaji Karyawan', 
          totalKeluarSesiIni, 
-         `Payroll Partial ${periodeClean} (${listGaji.length} Org)`, 
+         `Payroll ${periodeClean} (${listGaji.length} Org)`, 
          'Kas Tunai (Laci)'
      ]);
   }
   
   SpreadsheetApp.flush(); 
-  return "Pencairan untuk " + listGaji.length + " karyawan berhasil disimpan!";
+  return "Gaji berhasil dicairkan! Kasbon & Saldo terupdate.";
+}
+
+// --- HELPER: HITUNG HARI KERJA (SENIN - SABTU) ---
+function hitungHariKerja(tglMulai, tglSelesai) {
+  let count = 0;
+  let curDate = new Date(tglMulai.getTime());
+  
+  while (curDate <= tglSelesai) {
+    let dayOfWeek = curDate.getDay();
+    // 0 = Minggu. Hitung jika BUKAN Minggu (1-6)
+    if(dayOfWeek !== 0) { 
+       count++;
+    }
+    curDate.setDate(curDate.getDate() + 1);
+  }
+  return count;
 }
