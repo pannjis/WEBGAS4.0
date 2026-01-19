@@ -1828,3 +1828,86 @@ function getLaporanDetail(startStr, endStr) {
 
   return laporan;
 }
+
+function getNotifikasiData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const today = new Date();
+  let notifikasiList = [];
+  
+  // --- 1. CEK HUTANG PELANGGAN (Sheet TRANSAKSI) ---
+  const trxSheet = ss.getSheetByName('TRANSAKSI');
+  if (trxSheet) {
+    const dataTrx = trxSheet.getDataRange().getValues();
+    for (let i = 1; i < dataTrx.length; i++) {
+      let row = dataTrx[i];
+      // Kolom 8=Metode, 10=Status, 9=JatuhTempo (Sesuaikan index sheet Anda)
+      if (row[8] === 'Hutang' && row[10] === 'Belum Lunas' && row[9]) {
+        let tglJatuhTempo = new Date(row[9]);
+        let diffDays = Math.ceil((tglJatuhTempo - today) / (1000 * 60 * 60 * 24)); 
+        
+        if (diffDays <= 3) { 
+          let statusWaktu = (diffDays < 0) ? 'Telat ' + Math.abs(diffDays) + ' hari' : 'H-' + diffDays;
+          notifikasiList.push({
+            tipe: 'hutang',
+            judul: 'Tagihan Pelanggan',
+            pesan: `${row[2]} jatuh tempo (${statusWaktu})`,
+            waktu: Utilities.formatDate(tglJatuhTempo, Session.getScriptTimeZone(), 'dd/MM/yyyy')
+          });
+        }
+      }
+    }
+  }
+
+  // --- 2. CEK KASBON KARYAWAN (Sheet KASBON) ---
+  const kasbonSheet = ss.getSheetByName('KASBON');
+  if (kasbonSheet) {
+    const dataKasbon = kasbonSheet.getDataRange().getValues();
+    for (let i = 1; i < dataKasbon.length; i++) {
+      let row = dataKasbon[i];
+      if (row[5] !== 'Lunas' && row[4]) {
+        let tglJatuhTempo = new Date(row[4]);
+        let diffDays = Math.ceil((tglJatuhTempo - today) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays <= 3) {
+          let statusWaktu = (diffDays < 0) ? 'Telat ' + Math.abs(diffDays) + ' hari' : 'H-' + diffDays;
+          notifikasiList.push({
+            tipe: 'kasbon',
+            judul: 'Kasbon Karyawan',
+            pesan: `${row[1]} belum lunas (${statusWaktu})`,
+            waktu: Utilities.formatDate(tglJatuhTempo, Session.getScriptTimeZone(), 'dd/MM/yyyy')
+          });
+        }
+      }
+    }
+  }
+
+  // --- 3. [BARU] CEK STOK MENIPIS (Sheet PRODUK) ---
+  const prodSheet = ss.getSheetByName('PRODUK');
+  if (prodSheet) {
+    const dataProd = prodSheet.getDataRange().getValues();
+    // Index berdasarkan kode simpanTransaksiBulk Anda:
+    // Col 1 (B) = Nama Produk
+    // Col 4 (E) = Stok Isi (Ready)
+    
+    const BATAS_MINIM = 5; // <--- Ubah angka ini sesuai keinginan (misal 5 tabung)
+
+    for (let i = 1; i < dataProd.length; i++) {
+      let row = dataProd[i];
+      let namaProduk = row[1];
+      let stokReady = Number(row[4]);
+
+      // Jika stok di bawah batas minim, buat notifikasi
+      if (stokReady <= BATAS_MINIM) {
+        let pesanStok = (stokReady <= 0) ? 'HABIS!' : 'Sisa ' + stokReady;
+        notifikasiList.push({
+          tipe: 'stok',
+          judul: 'Stok Kritis',
+          pesan: `${namaProduk} segera habis (${pesanStok})`,
+          waktu: 'Cek Gudang'
+        });
+      }
+    }
+  }
+  
+  return notifikasiList;
+}
