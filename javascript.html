@@ -380,6 +380,31 @@ function handleLogin() {
         })
         .loginUser(u, p);
 }
+
+// --- TAMBAHAN: FUNGSI ENTER ---
+
+// Pastikan kode berjalan setelah halaman selesai dimuat
+document.addEventListener("DOMContentLoaded", function() {
+  
+  // Daftar ID input yang ingin diberi fungsi Enter
+  const fields = ['username', 'password'];
+
+  fields.forEach(function(id) {
+    const inputElement = document.getElementById(id);
+    
+    // Cek apakah elemen ada untuk menghindari error
+    if (inputElement) {
+      inputElement.addEventListener("keypress", function(event) {
+        // Jika tombol yang ditekan adalah Enter (Key Code 13 atau key === 'Enter')
+        if (event.key === "Enter") {
+          event.preventDefault(); // Mencegah refresh halaman jika ada tag <form>
+          handleLogin(); // Panggil fungsi login
+        }
+      });
+    }
+  });
+
+});
   
   function logout() {
     // 1. Tampilkan Loading sebentar agar transisi halus
@@ -416,6 +441,7 @@ function loadSemuaDataAwal() {
     loadPelangganDropdown();
     loadCompanyProfile(); 
     loadMetodeBayarKasir();
+    loadNotifikasiLonceng();
 }
 
 // Tambahkan di fungsi switchSettingTab yang sudah ada
@@ -1354,11 +1380,14 @@ function simpanProduk() {
         sku: document.getElementById('prod-sku').value,
         kode: document.getElementById('prod-kode').value,
         nama: document.getElementById('prod-nama').value, 
-        hargaJual: document.getElementById('prod-jual').value, 
-        hargaBeli: document.getElementById('prod-beli').value, 
+        
+        // [PERBAIKAN DISINI] Hapus tanda titik sebelum kirim ke server
+        hargaJual: document.getElementById('prod-jual').value.replace(/\./g, ''), 
+        hargaBeli: document.getElementById('prod-beli').value.replace(/\./g, ''), 
+        
         stokIsi: document.getElementById('prod-isi').value, 
         stokKosong: document.getElementById('prod-kosong').value,
-        gambar: '' // Nanti diisi
+        gambar: '' 
     };
 
     // Fungsi untuk mengirim data ke Google Script
@@ -1591,9 +1620,74 @@ function eksekusiBayarUtama() {
 // Panggil fungsi ini di window.onload agar saat buka aplikasi langsung cek
 // Tambahkan di dalam window.onload = function() { ... loadNotifHutang(); ... }
 
-function cekNotifHutang() {
-    // Nanti diarahkan ke halaman khusus hutang (Sementara alert dulu)
-    myAlert('Info Tagihan', 'Silakan buka menu Riwayat > Piutang untuk melihat detail penagihan.', 'info');
+// --- UPDATE FRONTEND NOTIFIKASI ---
+
+// Panggil fungsi ini di dalam `loadSemuaDataAwal()` atau saat login sukses
+function loadNotifikasiLonceng() {
+  google.script.run
+    .withSuccessHandler(renderNotifikasi)
+    .getNotifikasiData();
+}
+
+function renderNotifikasi(data) {
+  const badge = document.getElementById('notif-badge');
+  const container = document.getElementById('notif-list');
+  
+  // 1. Bersihkan isi list sebelumnya
+  container.innerHTML = '';
+  
+  // 2. JIKA DATA KOSONG / FRESH
+  if (!data || data.length === 0) {
+    badge.style.display = 'none'; // Sembunyikan badge merah
+    container.innerHTML = '<li><a class="dropdown-item text-muted text-center small" href="#" onclick="return false;">Tidak ada notifikasi baru</a></li>';
+    return; // PENTING: Stop fungsi di sini agar kode di bawah tidak dijalankan
+  }
+  
+  // 3. JIKA ADA DATA (Kode di bawah ini hanya jalan jika data > 0)
+  
+  // Tampilkan Angka di Badge
+  badge.innerText = data.length > 9 ? '9+' : data.length;
+  badge.style.display = 'inline-block'; // Munculkan badge
+  
+  // Loop data untuk ditampilkan ke list
+  data.forEach(item => {
+      
+      // Tentukan Ikon & Warna (Sesuai Material Icons)
+      let iconCode = 'info'; 
+      let warnaBg = 'bg-light';
+      let warnaIcon = 'text-warning';
+
+      if (item.tipe === 'hutang') {
+          iconCode = 'person'; 
+          warnaBg = 'bg-danger-subtle';
+          warnaIcon = 'text-danger';
+      } else if (item.tipe === 'kasbon') {
+          iconCode = 'payments'; 
+          warnaBg = 'bg-warning-subtle';
+          warnaIcon = 'text-warning';
+      } else if (item.tipe === 'stok') {
+          iconCode = 'inventory_2'; 
+          warnaBg = 'bg-danger-subtle'; 
+          warnaIcon = 'text-danger';
+      }
+
+      let html = `
+        <li>
+          <a class="dropdown-item d-flex align-items-center gap-3 py-2" href="#" onclick="return false;">
+            <div class="${warnaBg} rounded-circle p-2 d-flex justify-content-center align-items-center" style="width: 35px; height: 35px;">
+                <i class="material-icons ${warnaIcon}" style="font-size: 18px;">${iconCode}</i>
+            </div>
+            <div>
+              <div class="fw-bold text-dark" style="font-size: 13px;">${item.judul}</div>
+              <div class="text-muted" style="font-size: 11px; line-height: 1.2;">${item.pesan}</div>
+            </div>
+          </a>
+        </li>
+        <li><hr class="dropdown-divider my-0"></li>
+      `;
+      
+      container.insertAdjacentHTML('beforeend', html);
+  });
 }
 
 // [UPDATE] Fungsi Update Harga Beli dengan Format Ribuan
@@ -4741,7 +4835,7 @@ function cetakSlipPiutang(idTrx, pelanggan, total, jatuhTempo, mode) {
     
     let htmlLogo = '';
     if (logoUrl) {
-        htmlLogo = `<img src="${logoUrl}" style="height: 65px; width: auto; margin-right: 15px;">`;
+        htmlLogo = `<img src="${logoUrl}" style="height: 100px; width: auto; margin-right: 15px;">`;
     }
 
     const tglCetak = new Date().toLocaleString('id-ID');
@@ -4897,7 +4991,7 @@ function printLaporanPDF(tableId, judulLaporan) {
     // 2. Siapkan Logo (Ukuran Normal 70px)
     let htmlLogo = '';
     if (logoUrl) {
-        htmlLogo = `<img src="${logoUrl}" style="height: 75px; width: auto; margin-right: 20px;">`;
+        htmlLogo = `<img src="${logoUrl}" style="height: 100px; width: auto; margin-right: 20px;">`;
     }
 
     // 3. Header KOP SURAT (Dibuat Besar & Jelas Kembali)
@@ -5031,7 +5125,7 @@ function cetakNotaKeuangan(data) {
     
     let htmlLogo = '';
     if (logoUrl) {
-        htmlLogo = `<img src="${logoUrl}" style="height: 50px; width: auto; margin-right: 15px;">`;
+        htmlLogo = `<img src="${logoUrl}" style="height: 100px; width: auto; margin-right: 15px;">`;
     }
 
     // 2. Tentukan Judul, Warna & Label Tanda Tangan Ketiga
@@ -5453,7 +5547,7 @@ function cetakRekapKasbonFull(data) {
     const noPT = globalCompanyProfile.no_perusahaan || '-';
     const logoUrl = globalCompanyProfile.logo_perusahaan || '';
     
-    let htmlLogo = logoUrl ? `<img src="${logoUrl}" style="height: 60px; width: auto; margin-right: 20px; filter: grayscale(100%);">` : '';
+    let htmlLogo = logoUrl ? `<img src="${logoUrl}" style="height: 100px; width: auto; margin-right: 20px; filter: grayscale(100%);">` : '';
 
     // Generate Baris Tabel History
     let rowsHTML = '';
@@ -5666,7 +5760,7 @@ function cetakSlipGaji(data) {
     const alamatPT = globalCompanyProfile.alamat || '-';
     const logoUrl = globalCompanyProfile.logo_perusahaan || '';
     
-    let htmlLogo = logoUrl ? `<img src="${logoUrl}" style="height: 50px; width: auto; margin-right: 15px; filter: grayscale(100%);">` : '';
+    let htmlLogo = logoUrl ? `<img src="${logoUrl}" style="height: 100px; width: auto; margin-right: 15px; filter: grayscale(100%);">` : '';
 
     // 2. Format Rupiah Helper
     const rp = (n) => new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR', minimumFractionDigits:0}).format(n);
@@ -6282,6 +6376,71 @@ function printLaporanPDFCurrent() {
 
     win.document.write(htmlContent);
     win.document.close();
+}
+
+// --- FITUR NOTIFIKASI LONCENG ---
+
+function getNotifikasiData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const today = new Date();
+  let notifikasiList = [];
+  
+  // 1. CEK HUTANG PELANGGAN (Sheet TRANSAKSI)
+  const trxSheet = ss.getSheetByName('TRANSAKSI');
+  if (trxSheet) {
+    const dataTrx = trxSheet.getDataRange().getValues();
+    // Asumsi Kolom: 0=ID, 2=Pelanggan, 8=Metode, 9=JatuhTempo, 10=Status
+    // Sesuaikan index kolom jika berbeda
+    
+    for (let i = 1; i < dataTrx.length; i++) {
+      let row = dataTrx[i];
+      if (row[8] === 'Hutang' && row[10] === 'Belum Lunas' && row[9]) {
+        let tglJatuhTempo = new Date(row[9]);
+        
+        // Hitung selisih hari (H-3 sudah muncul notif)
+        let diffTime = tglJatuhTempo - today;
+        let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        
+        if (diffDays <= 3) { // Muncul jika H-3 atau sudah lewat
+          let statusWaktu = (diffDays < 0) ? 'Telat ' + Math.abs(diffDays) + ' hari' : 'H-' + diffDays;
+          notifikasiList.push({
+            tipe: 'hutang',
+            judul: 'Tagihan Pelanggan',
+            pesan: `${row[2]} jatuh tempo (${statusWaktu})`,
+            waktu: Utilities.formatDate(tglJatuhTempo, Session.getScriptTimeZone(), 'dd/MM/yyyy')
+          });
+        }
+      }
+    }
+  }
+
+  // 2. CEK KASBON KARYAWAN (Sheet KASBON - Jika ada)
+  const kasbonSheet = ss.getSheetByName('KASBON'); // Pastikan nama sheet sesuai
+  if (kasbonSheet) {
+    const dataKasbon = kasbonSheet.getDataRange().getValues();
+    // Asumsi: 1=Nama Karyawan, 3=Sisa, 4=Jatuh Tempo, 5=Status
+    for (let i = 1; i < dataKasbon.length; i++) {
+      let row = dataKasbon[i];
+      // Logika: Status Open/Belum Lunas
+      if (row[5] !== 'Lunas' && row[4]) {
+        let tglJatuhTempo = new Date(row[4]);
+        let diffTime = tglJatuhTempo - today;
+        let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays <= 3) {
+          let statusWaktu = (diffDays < 0) ? 'Telat ' + Math.abs(diffDays) + ' hari' : 'H-' + diffDays;
+          notifikasiList.push({
+            tipe: 'kasbon',
+            judul: 'Kasbon Karyawan',
+            pesan: `${row[1]} belum lunas (${statusWaktu})`,
+            waktu: Utilities.formatDate(tglJatuhTempo, Session.getScriptTimeZone(), 'dd/MM/yyyy')
+          });
+        }
+      }
+    }
+  }
+  
+  return notifikasiList;
 }
 
 // --- FUNGSI FORMAT RUPIAH SAAT MENGETIK ---
