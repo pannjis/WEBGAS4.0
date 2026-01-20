@@ -130,20 +130,29 @@
 
             <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg mt-2" style="border-radius: 12px; min-width: 200px;">
               <li class="px-3 py-2 border-bottom">
-                <span class="fw-bold d-block text-dark">Akun Saya</span>
-                <small class="text-muted" style="font-size: 11px;">Kelola profil & keamanan</small>
-              </li>
-              <li>
-                  <button type="button" class="dropdown-item py-2 mt-1" onclick="showPage('pengaturan')">
-                      <i class="material-icons align-middle me-2 fs-6 text-muted">settings</i> Pengaturan
-                  </button>
-              </li>
-              <li><hr class="dropdown-divider"></li>
-              <li>
-                <button class="dropdown-item py-2 text-danger fw-bold" onclick="logout()">
-                  <i class="material-icons align-middle me-2 fs-6">logout</i> Keluar Aplikasi
-                </button>
-              </li>
+    <span class="fw-bold d-block text-dark">Akun Saya</span>
+    <small class="text-muted" style="font-size: 11px;">Kelola profil & keamanan</small>
+</li>
+
+<li>
+    <button type="button" class="dropdown-item py-2 mt-1" onclick="showPage('pengaturan')">
+        <i class="material-icons align-middle me-2 fs-6 text-muted">settings</i> Pengaturan
+    </button>
+</li>
+
+<li>
+    <button type="button" class="dropdown-item py-2" onclick="tampilkanLogAktivitas()">
+        <i class="material-icons align-middle me-2 fs-6 text-muted">history</i> Log Aktivitas
+    </button>
+</li>
+
+<li><hr class="dropdown-divider"></li>
+
+<li>
+    <button class="dropdown-item py-2 text-danger fw-bold" onclick="logout()">
+        <i class="material-icons align-middle me-2 fs-6">logout</i> Keluar Aplikasi
+    </button>
+</li>
             </ul>
           </div>
         </div>
@@ -274,13 +283,13 @@
                   <h4 class="fw-bold m-0">Katalog Produk</h4>
                   <small class="text-muted">Klik produk untuk menambah ke keranjang</small>
                 </div>
-                <div class="bg-white p-1 rounded-pill shadow-sm border d-flex">
-                  <input type="radio" class="btn-check" name="posMode" id="mode-tukar" value="Tukar (Refill)" checked>
-                  <label class="btn btn-sm btn-outline-danger rounded-pill px-3 border-0 fw-bold" for="mode-tukar">Refill / Tukar</label>
+              <div class="bg-white p-1 rounded-pill shadow-sm border d-flex">
+                <input type="radio" class="btn-check" name="posMode" id="mode-tukar" value="Tukar (Refill)" checked onchange="filterProdukGrid()">
+                <label class="btn btn-sm btn-outline-danger rounded-pill px-3 border-0 fw-bold" for="mode-tukar">Refill / Tukar</label>
 
-                  <input type="radio" class="btn-check" name="posMode" id="mode-baru" value="Beli Tabung Baru">
-                  <label class="btn btn-sm btn-outline-danger rounded-pill px-3 border-0 fw-bold" for="mode-baru">Tabung Baru</label>
-                </div>
+                <input type="radio" class="btn-check" name="posMode" id="mode-baru" value="Beli Tabung Baru" onchange="filterProdukGrid()">
+                <label class="btn btn-sm btn-outline-danger rounded-pill px-3 border-0 fw-bold" for="mode-baru">Beli Baru (+Wadah)</label>
+              </div>
               </div>
 
               <div class="pos-search-bar d-flex align-items-center mb-4">
@@ -544,128 +553,150 @@
 
           <div class="card p-0 overflow-hidden">
             <table class="table table-custom table-hover m-0" id="tabel-produk">
-              <thead class="bg-light">
-                <tr>
-                  <th>Nama</th>
-                  <th>Jual</th>
-                  <th>Beli</th>
-                  <th>Isi</th>
-                  <th>Kosong</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
+                <thead class="bg-light">
+                  <tr>
+                    <th>Nama</th>
+                    <th>Jual (Isi)</th>
+                    <th>Beli (Isi)</th>
+                    <th class="text-muted">Jual Tbg</th> 
+                    <th class="text-muted">Beli Tbg</th>
+                    
+                    <th class="text-center">Stok Isi</th>
+                    <th class="text-center">Stok Kosong</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
               <tbody></tbody>
             </table>
           </div>
         </div>
 
-        <div id="page-edit-produk" class="page-section d-none">
-          
-          <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h4 class="fw-bold m-0">Edit Produk</h4>
-                <small class="text-muted">Perbarui informasi dan harga produk</small>
-            </div>
-            <button class="btn btn-light border shadow-sm rounded-pill px-4 fw-bold text-secondary" onclick="showPage('produk')">
-                <i class="material-icons align-middle me-1" style="font-size:18px">arrow_back</i> Kembali
-            </button>
-          </div>
+<div id="page-edit-produk" class="page-section d-none">
+  
+  <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+        <h4 class="fw-bold m-0">Edit Produk</h4>
+        <small class="text-muted">Perbarui informasi dan harga produk</small>
+    </div>
+    <button class="btn btn-outline-secondary rounded-pill px-4 fw-bold" onclick="showPage('produk')">
+        <i class="material-icons align-middle me-1" style="font-size:18px">arrow_back</i> Kembali
+    </button>
+  </div>
 
-          <div class="row justify-content-center">
-            <div class="col-lg-10">
-              
-              <div class="card border-0 shadow-lg" style="border-radius: 16px;">
-                <div class="card-body p-4 p-md-5">
-                    
-                    <input type="hidden" id="edit-prod-id">
+  <div class="row justify-content-center">
+    <div class="col-lg-9 col-md-10"> <div class="card border-0 shadow-lg rounded-4">
+        <div class="card-body p-4 p-md-5">
+            
+            <input type="hidden" id="edit-prod-id">
 
-                    <h6 class="text-uppercase text-muted fw-bold mb-3 small letter-spacing-1">Informasi Dasar</h6>
-                    
-                    <div class="row g-3 mb-4">
-                      <div class="col-md-6">
-                          <label class="form-label small fw-bold">SKU (Stock Keeping Unit)</label>
-                          <div class="input-group">
-                              <span class="input-group-text bg-light border-0"><i class="material-icons fs-6 text-muted">qr_code</i></span>
-                              <input id="edit-prod-sku" class="form-control bg-light border-0 py-2" placeholder="Kode SKU">
-                          </div>
-                      </div>
-                      <div class="col-md-6">
-                          <label class="form-label small fw-bold">Kode Barcode</label>
-                          <div class="input-group">
-                              <span class="input-group-text bg-light border-0"><i class="material-icons fs-6 text-muted">qr_code_scanner</i></span>
-                              <input id="edit-prod-kode" class="form-control bg-light border-0 py-2" placeholder="Scan Barcode">
-                          </div>
-                      </div>
-                      <div class="col-12">
-                          <label class="form-label small fw-bold">Nama Produk</label>
-                          <input id="edit-prod-nama" class="form-control bg-light border-0 py-2 fw-bold text-dark fs-5" placeholder="Nama Produk">
-                      </div>
-                    </div>
-
-                    <hr class="text-muted opacity-25 my-4">
-
-                    <h6 class="text-uppercase text-muted fw-bold mb-3 small letter-spacing-1">Harga</h6>
-                    <div class="row g-3 mb-4">
-                      <div class="col-md-6">
-                          <label class="form-label small fw-bold text-primary">Harga Jual</label>
-                          <div class="input-group">
-                              <span class="input-group-text bg-white border text-muted fw-bold">Rp</span>
-                              <input id="edit-prod-jual" type="number" class="form-control border fw-bold text-primary py-2" style="font-size: 1.1rem;">
-                          </div>
-                      </div>
-                      <div class="col-md-6">
-                          <label class="form-label small fw-bold text-muted">Harga Beli (Modal)</label>
-                          <div class="input-group">
-                              <span class="input-group-text bg-light border-0 text-muted">Rp</span>
-                              <input id="edit-prod-beli" type="number" class="form-control bg-light border-0 py-2">
-                          </div>
-                      </div>
-                    </div>
-
-                    <div class="alert alert-light border border-danger-subtle bg-danger-subtle rounded-3 p-4 mb-4">
-                      <div class="d-flex align-items-center mb-3 text-danger">
-                          <i class="material-icons me-2">lock</i>
-                          <h6 class="fw-bold m-0">Stok Gudang (Terkunci)</h6>
-                      </div>
-                      
-                      <div class="row g-3">
-                          <div class="col-6">
-                            <label class="small fw-bold text-muted mb-1">Stok Isi</label>
-                            <input id="edit-prod-isi" type="text" class="form-control bg-white border-0 text-center fw-bold fs-5 shadow-sm" readonly>
-                          </div>
-                          <div class="col-6">
-                            <label class="small fw-bold text-muted mb-1">Stok Kosong</label>
-                            <input id="edit-prod-kosong" type="text" class="form-control bg-white border-0 text-center fw-bold fs-5 shadow-sm" readonly>
-                          </div>
-                      </div>
-                      <div class="mt-2 text-end">
-                          <small class="text-muted fst-italic" style="font-size: 11px;">*Perubahan stok hanya melalui menu Pembelian / Transaksi.</small>
-                      </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label small fw-bold">Foto Produk</label>
-                        <div class="d-flex align-items-center p-3 border rounded-3 bg-light">
-                            <img id="edit-img-preview" src="" class="rounded-3 shadow-sm bg-white me-3 d-none" style="width: 70px; height: 70px; object-fit: cover;">
-                            <div class="flex-grow-1">
-                                <input type="file" id="edit-prod-file" class="form-control form-control-sm mb-1" accept="image/*" onchange="previewEditImage(this)">
-                                <small class="text-muted d-block" style="font-size: 11px;">Upload gambar baru untuk mengganti.</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="d-grid pt-2">
-                      <button onclick="prosesSimpanEdit()" class="btn btn-primary btn-lg fw-bold rounded-pill shadow-primary">
-                          <i class="material-icons align-middle me-2">save</i> SIMPAN PERUBAHAN
-                      </button>
-                    </div>
-
-                </div>
+            <h6 class="text-uppercase text-muted fw-bold mb-3 small" style="letter-spacing: 1px;">Informasi Dasar</h6>
+            
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                  <label class="form-label small fw-bold">SKU (Stock Keeping Unit)</label>
+                  <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0 text-muted"><i class="material-icons fs-6">qr_code</i></span>
+                      <input id="edit-prod-sku" class="form-control bg-light border-start-0" placeholder="Kode SKU">
+                  </div>
               </div>
-
+              <div class="col-md-6">
+                  <label class="form-label small fw-bold">Kode Barcode</label>
+                  <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0 text-muted"><i class="material-icons fs-6">qr_code_scanner</i></span>
+                      <input id="edit-prod-kode" class="form-control bg-light border-start-0" placeholder="Scan Barcode">
+                  </div>
+              </div>
+              <div class="col-12">
+                  <label class="form-label small fw-bold">Nama Produk</label>
+                  <input id="edit-prod-nama" class="form-control fw-bold text-dark fs-5" placeholder="Nama Produk">
+              </div>
             </div>
-          </div>
+
+            <hr class="text-muted opacity-25 my-4">
+
+            <h6 class="text-uppercase text-muted fw-bold mb-3 small" style="letter-spacing: 1px;">Harga (Isi Ulang / Refill)</h6>
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                  <label class="form-label small fw-bold text-primary">Harga Jual Refill</label>
+                  <div class="input-group">
+                      <span class="input-group-text bg-white border fw-bold text-primary">Rp</span>
+                      <input id="edit-prod-jual" type="text" class="form-control border fw-bold text-primary" onkeyup="formatRupiahInput(this)">
+                  </div>
+              </div>
+              <div class="col-md-6">
+                  <label class="form-label small fw-bold text-muted">Harga Modal Refill (HPP)</label>
+                  <div class="input-group">
+                      <span class="input-group-text bg-white border fw-bold text-primary">Rp</span>
+                      <input id="edit-prod-beli" type="text" class="form-control border" onkeyup="formatRupiahInput(this)">
+                  </div>
+              </div>
+            </div>
+
+            <h6 class="text-uppercase text-muted fw-bold mb-3 small" style="letter-spacing: 1px;">Harga (Wadah Kosong)</h6>
+            <div class="p-3 bg-light rounded border mb-4">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                      <label class="form-label small fw-bold text-dark">Harga Jual</label>
+                      <div class="input-group">
+                          <span class="input-group-text bg-white border fw-bold text-dark">Rp</span>
+                          <input id="edit-prod-jual-tabung" type="text" class="form-control border fw-bold text-dark" onkeyup="formatRupiahInput(this)" placeholder="Cth: 198.000">
+                      </div>
+                      <div class="form-text small mt-1" style="font-size: 11px;">Ditambahkan saat transaksi "Tabung Baru".</div>
+                  </div>
+                  <div class="col-md-6">
+                      <label class="form-label small fw-bold text-muted">Harga Modal (HPP)</label>
+                      <div class="input-group">
+                          <span class="input-group-text bg-white border-0 text-muted">Rp</span>
+                          <input id="edit-prod-beli-tabung" type="text" class="form-control bg-white border-0" onkeyup="formatRupiahInput(this)" placeholder="Cth: 189.000">
+                      </div>
+                  </div>
+                </div>
+            </div>
+
+            <div class="alert alert-danger border-0 bg-danger-subtle mb-4">
+              <div class="d-flex align-items-center mb-3 text-danger">
+                  <i class="material-icons me-2">lock</i>
+                  <h6 class="fw-bold m-0">Stok Gudang (Terkunci)</h6>
+              </div>
+              
+              <div class="row g-3">
+                  <div class="col-6 text-center border-end border-danger-subtle">
+                    <label class="small fw-bold text-muted mb-0">Stok Isi</label>
+                    <input id="edit-prod-isi" type="text" class="form-control bg-transparent border-0 text-center fw-bold fs-4 text-danger p-0" readonly>
+                  </div>
+                  <div class="col-6 text-center">
+                    <label class="small fw-bold text-muted mb-0">Stok Kosong</label>
+                    <input id="edit-prod-kosong" type="text" class="form-control bg-transparent border-0 text-center fw-bold fs-4 text-danger p-0" readonly>
+                  </div>
+              </div>
+              <div class="mt-3 pt-2 border-top border-danger-subtle text-center">
+                  <small class="text-danger opacity-75 fst-italic" style="font-size: 11px;">*Perubahan stok hanya melalui menu Pembelian / Transaksi.</small>
+              </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label small fw-bold">Foto Produk</label>
+                <div class="d-flex align-items-center p-3 border rounded-3 bg-white shadow-sm">
+                    <img id="edit-img-preview" src="" class="rounded-3 border me-3 d-none" style="width: 70px; height: 70px; object-fit: cover;">
+                    <div class="flex-grow-1">
+                        <input type="file" id="edit-prod-file" class="form-control form-control-sm mb-1" accept="image/*" onchange="previewEditImage(this)">
+                        <small class="text-muted d-block" style="font-size: 11px;">Upload gambar baru untuk mengganti.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid pt-2">
+              <button onclick="prosesSimpanEdit()" class="btn btn-primary btn-lg fw-bold rounded-pill shadow-sm">
+                  <i class="material-icons align-middle me-2">save</i> SIMPAN PERUBAHAN
+              </button>
+            </div>
+
         </div>
+      </div>
+
+    </div>
+  </div>
+</div>
 
         <div id="page-pelanggan" class="page-section d-none">
           <div class="d-flex justify-content-between mb-3">
@@ -1459,71 +1490,89 @@
             </div>
           </div>
 
-      </div> </div> </div> <div class="modal fade" id="modalProduk" tabindex="-1">
-      <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5>Produk</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+<div class="modal fade" id="modalProduk" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered"> <div class="modal-content border-0 shadow"> <div class="modal-header bg-light"> <h5 class="modal-title fw-bold">Produk Baru</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <div class="modal-body p-4"> <div class="row g-3 mb-3"> <div class="col-6">
+                        <label class="small fw-bold mb-1">SKU</label>
+                        <input id="prod-sku" class="form-control" placeholder="Cth: GAS-3KG">
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold mb-1">Kode Produk</label>
+                        <input id="prod-kode" class="form-control" placeholder="Barcode/Kode">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="small fw-bold mb-1">Nama Produk</label>
+                    <input id="prod-nama" class="form-control" placeholder="Nama Produk">
+                </div>
+
+                <div class="mb-4 border rounded p-3 bg-light">
+                    <label class="small fw-bold mb-2 d-block">Foto Produk</label>
+                    
+                    <input type="file" id="prod-file-gambar" class="form-control form-control-sm mb-2" accept="image/*" onchange="tampilkanPreview(this)">
+                    
+                    <div class="text-center">
+                        <img id="img-preview" src="" class="d-none rounded border shadow-sm mt-2" style="max-height: 150px; max-width: 100%; object-fit: contain;">
+                        <div id="loading-upload" class="text-primary small d-none mt-2">
+                            <div class="spinner-border spinner-border-sm" role="status"></div> Sedang memproses...
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-2" style="font-size:10px">*Gambar akan disimpan di Google Drive Anda.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="small fw-bold mb-2 text-primary">Harga Refill (Isi Ulang)</label>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="small text-muted mb-1" style="font-size: 10px;">Harga Jual</label>
+                            <input id="prod-jual" type="text" class="form-control fw-bold" placeholder="Rp 0" onkeyup="formatRupiahInput(this)">
+                        </div>
+                        <div class="col-6">
+                            <label class="small text-muted mb-1" style="font-size: 10px;">Harga Beli (Modal)</label>
+                            <input id="prod-beli" type="text" class="form-control" placeholder="Rp 0" onkeyup="formatRupiahInput(this)">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded border mb-4" style="background-color: #f8f9fa;">
+                    <label class="small fw-bold mb-2 text-dark">Harga Kosongan (Opsional)</label>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="small text-muted mb-1" style="font-size: 10px;">Jual Tabung</label>
+                            <input id="prod-jual-tabung" type="text" class="form-control fw-bold" placeholder="Rp 0" onkeyup="formatRupiahInput(this)">
+                        </div>
+                        <div class="col-6">
+                            <label class="small text-muted mb-1" style="font-size: 10px;">Modal Tabung</label>
+                            <input id="prod-beli-tabung" type="text" class="form-control" placeholder="Rp 0" onkeyup="formatRupiahInput(this)">
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-2" style="font-size:10px">*Isi jika produk ini bisa dijual paket tabung baru.</small>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="small fw-bold mb-1">Stok Isi</label>
+                        <input id="prod-isi" type="number" class="form-control" placeholder="0">
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold mb-1">Stok Kosong</label>
+                        <input id="prod-kosong" type="number" class="form-control" placeholder="0">
+                    </div>
+                </div>
+
+            </div>
+            
+            <div class="modal-footer border-top-0 bg-light">
+                <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-primary fw-bold rounded-pill px-4" onclick="simpanProduk()">SIMPAN PRODUK</button>
+            </div>
         </div>
-        <div class="modal-body">
-          <div class="row mb-2">
-            <div class="col-6">
-              <label class="small fw-bold">SKU</label>
-              <input id="prod-sku" class="form-control" placeholder="Cth: GAS-3KG">
-            </div>
-            <div class="col-6">
-              <label class="small fw-bold">Kode Produk</label>
-              <input id="prod-kode" class="form-control" placeholder="Barcode/Kode">
-            </div>
-          </div>
-
-          <label class="small fw-bold">Nama Produk</label>
-          <input id="prod-nama" class="form-control mb-2" placeholder="Nama Produk">
-
-          <label class="small fw-bold">Link Gambar (URL)</label>
-          <label class="small fw-bold">Upload Gambar Produk</label>
-          <input type="file" id="prod-file-gambar" class="form-control mb-2" accept="image/*" onchange="tampilkanPreview(this)">
-
-          <div class="text-center mb-3">
-            <img id="img-preview" src="" class="d-none rounded border shadow-sm" style="max-height: 200px; max-width: 100%; object-fit: contain;">
-          </div>
-
-          <div id="loading-upload" class="text-primary small d-none">
-            <div class="spinner-border spinner-border-sm" role="status"></div> Sedang memproses...
-          </div>
-          <small class="text-muted d-block mb-2" style="font-size:10px">Gambar akan disimpan di Google Drive Anda.</small>
-          <small class="text-muted d-block mb-2" style="font-size:10px">Salin link gambar dari internet/Google Drive (Pastikan link publik).</small>
-
-          <div class="row mb-2">
-            <div class="col-6">
-              <label class="small fw-bold">Harga Jual</label>
-              <input id="prod-jual" type="text" class="form-control" placeholder="0" onkeyup="formatRupiahInput(this)">
-            </div>
-            <div class="col-6">
-              <label class="small fw-bold">Harga Beli</label>
-              <input id="prod-beli" type="text" class="form-control" placeholder="0" onkeyup="formatRupiahInput(this)">
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="col">
-              <label class="small fw-bold">Stok Isi</label>
-              <input id="prod-isi" type="number" class="form-control" placeholder="0">
-            </div>
-            <div class="col">
-              <label class="small fw-bold">Stok Kosong</label>
-              <input id="prod-kosong" type="number" class="form-control" placeholder="0">
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer border-top-0">
-          <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Batal</button>
-          <button type="button" class="btn btn-primary fw-bold rounded-pill px-4" onclick="simpanProduk()">SIMPAN PRODUK</button>
-        </div>
-      </div>
     </div>
-  </div>
-
+</div>
       <div class="modal fade" id="modalKaryawan" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
           <div class="modal-content">
@@ -1908,30 +1957,52 @@
     </div>
   </div>
 
-  <div class="modal fade" id="modalInputQty" tabindex="-1">
-    <div class="modal-dialog modal-sm modal-dialog-centered">
-      <div class="modal-content shadow-lg border-0">
-        <div class="modal-header border-0 pb-0 justify-content-center">
-          <h6 class="modal-title fw-bold text-center" id="qty-modal-title">Nama Produk</h6>
+<div class="modal fade" id="modalInputQty" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+      
+      <div class="modal-header border-0 py-3 text-white" style="background: linear-gradient(45deg, #0d6efd, #0a58ca);">
+        <div>
+            <h6 class="modal-title fw-bold" id="qty-modal-title" style="font-size: 1rem;">Nama Produk</h6>
+            <small class="opacity-75" style="font-size: 0.75rem;">Edit Harga & Jumlah</small>
         </div>
-        <div class="modal-body text-center">
-          <label class="small text-muted mb-2">Masukkan Jumlah (Qty)</label>
-          <input type="number" id="input-qty-pos" class="form-control form-control-lg text-center fw-bold fs-2 text-primary border-primary" value="1" min="1">
-          <div class="small text-danger mt-1 d-none" id="qty-msg-error">Stok tidak cukup!</div>
-        </div>
-        <div class="modal-footer border-0 pt-0">
-          <div class="row w-100 g-2">
-            <div class="col-6">
-              <button type="button" class="btn btn-light w-100 rounded-pill" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body p-4 bg-light">
+        
+        <div id="box-toggle-tabung" class="d-none mb-3 p-3 rounded-3 border d-flex justify-content-between align-items-center bg-white shadow-sm transition-all">
+            <div style="line-height: 1.2;">
+                <span class="d-block fw-bold text-dark" id="lbl-toggle-main" style="font-size: 0.9rem;">Tabung + Isi</span>
+                <small class="text-muted" id="lbl-toggle-sub" style="font-size: 0.7rem;">Paket Lengkap</small>
             </div>
-            <div class="col-6">
-              <button type="button" class="btn btn-primary w-100 rounded-pill fw-bold" onclick="submitQtyPOS()">ENTER</button>
+            <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="toggle-isi-tabung" checked onchange="hitungHargaToggle()" style="transform: scale(1.3); cursor: pointer;">
             </div>
-          </div>
         </div>
+
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-2">
+                <label class="small fw-bold text-muted mb-1 ps-1">Harga Satuan (Rp)</label>
+                <input type="text" id="input-harga-custom" class="form-control border-0 fw-bold text-primary text-center" style="font-size: 1.5rem; background: transparent;" onkeyup="formatRupiahInput(this)">
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-between bg-white p-1 rounded-pill border shadow-sm mb-3">
+             <button type="button" class="btn btn-light rounded-circle text-primary fw-bold" onclick="ubahQtyModal(-1)" style="width: 40px; height: 40px;">-</button>
+             <input type="number" id="input-qty-pos" class="form-control border-0 text-center fw-bold fs-5 bg-transparent" value="1" min="1" style="width: 80px;">
+             <button type="button" class="btn btn-primary rounded-circle fw-bold shadow-sm" onclick="ubahQtyModal(1)" style="width: 40px; height: 40px;">+</button>
+        </div>
+
+        <div id="qty-msg-error" class="text-danger small text-center mb-2 fw-bold d-none"></div>
+
+        <button onclick="submitQtyPOS()" class="btn btn-primary w-100 py-2 fw-bold rounded-pill shadow btn-animate-bounce">
+            <i class="material-icons align-middle me-1" style="font-size:18px">shopping_cart_checkout</i> SIMPAN
+        </button>
       </div>
     </div>
   </div>
+</div>
 
   <div class="modal fade" id="modalInvoice" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg">
@@ -2271,6 +2342,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://npmcdn.com/flatpickr/dist/l10n/id.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <?!= include('javascript'); ?>
 </body>
 </html>
