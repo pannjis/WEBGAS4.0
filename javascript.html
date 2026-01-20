@@ -22,6 +22,7 @@
   let onConfirmAction = null;
   const rupiah = (n) => new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR', minimumFractionDigits:0}).format(n);
 
+
 window.onload = function() { 
       // 1. Setup Database
       google.script.run.setupDatabase(); 
@@ -987,17 +988,28 @@ function loadProduk() {
       
       // 2. Render Tabel Admin (YANG HILANG SEBELUMNYA)
       const tb = document.querySelector('#tabel-produk tbody');
-      if(tb) {
+        if(tb) {
          tb.innerHTML = ''; // Kosongkan tabel dulu
             data.forEach(r => {
-            // r[0]: ID (PENTING UNTUK EDIT), r[1]: Nama, dll
+            
+            // [BARU] Ambil Data Harga Tabung (Index 9 & 10 sesuai CODE.GS)
+            let hargaBeliTabung = r[9] || 0;
+            let hargaJualTabung = r[10] || 0;
+
+            // Render Baris
             tb.innerHTML += `
               <tr>
-                <td class="fw-bold">${r[1]}</td>
-                <td>${rupiah(r[2])}</td>
-                <td>${rupiah(r[3])}</td>
-                <td class="text-center">${r[4]}</td>
-                <td class="text-center">${r[5]}</td>
+                <td class="fw-bold text-dark">${r[1]}</td>
+                
+                <td class="text-success fw-bold">${rupiah(r[2])}</td>
+                <td class="text-muted small">${rupiah(r[3])}</td>
+                
+                <td class="text-primary fw-bold" style="background-color:#f8f9fa;">${rupiah(hargaJualTabung)}</td>
+                <td class="text-muted small" style="background-color:#f8f9fa;">${rupiah(hargaBeliTabung)}</td>
+
+                <td class="text-center fw-bold">${r[4]}</td>
+                <td class="text-center text-secondary">${r[5]}</td>
+                
                 <td>
                    <button class="btn btn-sm btn-warning text-dark border me-1" onclick="bukaHalamanEdit('${r[0]}')">
                      <i class="material-icons" style="font-size:14px">edit</i>
@@ -1022,42 +1034,37 @@ function loadProduk() {
     }).getData('PRODUK');
 }
 
-// 1. Fungsi Membuka Halaman Edit & Isi Data
+// [UPDATE] 4. BUKA HALAMAN EDIT (Isi Field Baru)
 function bukaHalamanEdit(id) {
-    // Cari data produk di variabel global berdasarkan ID (Kolom 0)
     const produk = globalProdukList.find(row => row[0] == id);
-    
     if (!produk) return myAlert('Error', 'Data produk tidak ditemukan.', 'error');
 
-    // Isi Form Edit dengan Data Lama
-    document.getElementById('edit-prod-id').value = produk[0]; // ID
+    // Field Lama
+    document.getElementById('edit-prod-id').value = produk[0];
     document.getElementById('edit-prod-nama').value = produk[1];
-    document.getElementById('edit-prod-jual').value = produk[2];
-    document.getElementById('edit-prod-beli').value = produk[3];
-    
-    // Stok (Read Only)
+    document.getElementById('edit-prod-sku').value = produk[6] || '';
+    document.getElementById('edit-prod-kode').value = produk[7] || '';
     document.getElementById('edit-prod-isi').value = produk[4];
     document.getElementById('edit-prod-kosong').value = produk[5];
 
-    // Info Tambahan
-    document.getElementById('edit-prod-sku').value = produk[6] || '';
-    document.getElementById('edit-prod-kode').value = produk[7] || '';
+    // Field Harga (Format Ribuan)
+    document.getElementById('edit-prod-jual').value = Number(produk[2]).toLocaleString('id-ID'); // Jual Isi
+    document.getElementById('edit-prod-beli').value = Number(produk[3]).toLocaleString('id-ID'); // Beli Isi (Modal)
 
-    // Preview Gambar Lama
+    // [BARU] Field Harga Tabung
+    document.getElementById('edit-prod-jual-tabung').value = Number(produk[10] || 0).toLocaleString('id-ID');
+    document.getElementById('edit-prod-beli-tabung').value = Number(produk[9] || 0).toLocaleString('id-ID');
+
+    // Gambar
     const imgUrl = produk[8];
     const imgPrev = document.getElementById('edit-img-preview');
-    if(imgUrl && imgUrl.includes('http')) {
-        imgPrev.src = imgUrl;
-        imgPrev.classList.remove('d-none');
+    if(imgUrl && imgUrl.length > 5) {
+        imgPrev.src = imgUrl; imgPrev.classList.remove('d-none');
     } else {
-        imgPrev.src = ''; 
-        imgPrev.classList.add('d-none');
+        imgPrev.src = ''; imgPrev.classList.add('d-none');
     }
-
-    // Reset Input File
     document.getElementById('edit-prod-file').value = '';
 
-    // Pindah Tampilan ke Halaman Edit
     showPage('edit-produk');
 }
 
@@ -1074,52 +1081,42 @@ function previewEditImage(input) {
     }
 }
 
-// 3. Proses Simpan ke Server
+// [UPDATE] 5. PROSES SIMPAN EDIT (Kirim Field Baru)
 function prosesSimpanEdit() {
     const fileInput = document.getElementById('edit-prod-file');
     const file = fileInput.files[0];
 
-    // Ambil Data Form
+    // Helper Unformat Rupiah
+    const num = (id) => Number(document.getElementById(id).value.replace(/\./g, '')) || 0;
+
     const payload = {
         id: document.getElementById('edit-prod-id').value,
         nama: document.getElementById('edit-prod-nama').value,
-        hargaJual: document.getElementById('edit-prod-jual').value,
-        hargaBeli: document.getElementById('edit-prod-beli').value,
         sku: document.getElementById('edit-prod-sku').value,
         kode: document.getElementById('edit-prod-kode').value,
-        gambar: null // Default null (tidak ganti)
+        
+        hargaJual: num('edit-prod-jual'),
+        hargaBeli: num('edit-prod-beli'),
+        hargaJualTabung: num('edit-prod-jual-tabung'), // [Baru]
+        hargaBeliTabung: num('edit-prod-beli-tabung'), // [Baru]
+        
+        gambar: null 
     };
 
-    if(!payload.nama) return myAlert('Error', 'Nama produk tidak boleh kosong', 'warning');
-
-    // Fungsi Pengirim
+    // ... (Logika kirim updateProduk sama, cuma payload nambah) ...
+    // Copy paste logika fileReader dari kode lama disini
     const kirimUpdate = (data) => {
         loading(true);
-        google.script.run
-            .withSuccessHandler(res => {
-                loading(false);
-                myAlert('Sukses', res, 'success');
-                showPage('produk'); // Kembali ke tabel
-                loadProduk();       // Refresh data tabel
-            })
-            .withFailureHandler(err => {
-                loading(false);
-                myAlert('Gagal', err.message, 'error');
-            })
-            .updateProduk(data);
+        google.script.run.withSuccessHandler(res => {
+            loading(false); myAlert('Sukses', res, 'success');
+            showPage('produk'); loadProduk();
+        }).updateProduk(data);
     };
 
-    // Cek Upload Gambar Baru
     if (file) {
-        if (file.size > 2 * 1024 * 1024) return myAlert('File Besar', 'Maksimal 2MB', 'warning');
-        
         const reader = new FileReader();
         reader.onload = function(e) {
-            payload.gambar = {
-                data: e.target.result.split(',')[1],
-                mimeType: file.type,
-                fileName: file.name
-            };
+            payload.gambar = { data: e.target.result.split(',')[1], mimeType: file.type, fileName: file.name };
             kirimUpdate(payload);
         };
         reader.readAsDataURL(file);
@@ -1132,49 +1129,80 @@ function prosesSimpanEdit() {
 function renderProdukGrid(data) {
    const container = document.getElementById('pos-grid-container');
    if(!container) return;
-   
    container.innerHTML = '';
 
-   data.forEach(p => {
-      // Index Data: 
-      // 0:ID, 1:Nama, 2:Jual, 3:Beli, 4:Isi, 5:Kosong, 6:SKU, 7:Kode, 8:Gambar
-      
-      let nama = p[1];
-      let harga = p[2];
-      let stok = Number(p[4]);
-      let linkGambar = p[8]; // Ambil link gambar dari kolom index 8
+   // 1. CEK MODE SAAT INI (REFILL / BARU)
+   let modeEl = document.querySelector('input[name="posMode"]:checked');
+   let mode = modeEl ? modeEl.value : 'Tukar (Refill)';
 
-      // Logika Tampilan Gambar
-      let gambarHtml = '';
-      if(linkGambar && linkGambar.length > 5) {
-          // Jika ada link gambar, pakai tag IMG
-          gambarHtml = `<img src="${linkGambar}" class="mb-2 rounded" style="width: 100%; height: 100px; object-fit: contain;">`;
+   data.forEach(p => {
+      let nama = p[1];
+      let hargaRefill = Number(p[2]); 
+      let hargaTabung = Number(p[10]) || 0; 
+      
+      let stokIsi = Number(p[4]);    // Stok Gas (Isi)
+      let stokKosong = Number(p[5]); // Stok Tabung Kosong (Cangkang)
+      let linkGambar = p[8]; 
+
+      // 2. TENTUKAN HARGA & STOK UTAMA YANG TAMPIL
+      let hargaShow = 0;
+      let stokShow = 0;
+      let labelStok = '';
+      let warnaStok = '';
+
+      if (mode === 'Beli Tabung Baru') {
+          // Mode Baru: Harga Paket
+          hargaShow = hargaRefill + hargaTabung;
+          stokShow = stokIsi; 
+          labelStok = 'Ready Isi'; 
+          warnaStok = 'bg-primary-subtle text-primary border-primary-subtle';
       } else {
-          // Jika tidak ada, pakai Icon default
-          gambarHtml = `
-           <div class="product-icon mx-auto mb-2">
-              <i class="material-icons">propane</i> 
-           </div>`;
+          // Mode Refill
+          hargaShow = hargaRefill;
+          stokShow = stokIsi;
+          labelStok = 'Ready Isi';
+          warnaStok = 'bg-success-subtle text-success border-success-subtle';
       }
 
-      let disabledClass = stok <= 0 ? 'opacity-50 grayscale' : '';
-      let badgeStok = stok > 0 
-          ? `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size:10px;">Stok: ${stok}</span>` 
-          : `<span class="badge bg-danger text-white rounded-pill">Habis</span>`;
+      // 3. RENDER TAMPILAN GAMBAR
+      let gambarHtml = (linkGambar && linkGambar.length > 5) 
+          ? `<img src="${linkGambar}" class="mb-2 rounded" style="width: 100%; height: 100px; object-fit: contain;">`
+          : `<div class="product-icon mx-auto mb-2"><i class="material-icons">propane</i></div>`;
+
+      let disabledClass = stokShow <= 0 ? 'opacity-50 grayscale' : '';
       
-      // Tampilkan SKU/Kode kecil di atas nama (Opsional)
-      let kodeHtml = p[6] ? `<small class="text-muted d-block mb-1" style="font-size:10px;">${p[6]}</small>` : '';
+      // Badge Stok Utama (Isi)
+      let badgeStok = stokShow > 0 
+          ? `<span class="badge ${warnaStok} border rounded-pill mb-1" style="font-size:10px;">${labelStok}: ${stokShow}</span>` 
+          : `<span class="badge bg-danger text-white rounded-pill mb-1">Stok Isi Habis</span>`;
+      
+      // [BARU] Tampilan Stok Wadah (Lebih Umum)
+      let infoKosong = `
+        <div class="d-flex justify-content-center align-items-center mt-1" style="font-size: 11px; color: #6c757d;">
+            <span class="material-icons me-1" style="font-size: 12px;">check_box_outline_blank</span>
+            <span>Stok Wadah: <b>${stokKosong}</b></span>
+        </div>
+      `;
+
+      // Harga
+      let hargaHtml = stokShow > 0 
+          ? `<div class="text-dark fw-bold mb-1 transition-all" style="font-size: 0.95rem;">${rupiah(hargaShow)}</div>`
+          : `<div class="text-muted text-decoration-line-through mb-1 small">${rupiah(hargaShow)}</div>`;
 
       container.innerHTML += `
       <div class="col-6 col-md-4 col-lg-3">
          <div class="card h-100 product-card border-0 shadow-sm ${disabledClass}" 
-              onclick="klikProdukPOS('${nama}', ${harga}, ${stok})">
-            <div class="card-body text-center p-2">
-               ${gambarHtml}
-               ${kodeHtml}
-               <h6 class="fw-bold text-dark mb-1 text-truncate" title="${nama}" style="font-size: 0.9rem;">${nama}</h6>
-               <div class="text-primary fw-bold mb-2 small">${rupiah(harga)}</div>
-               ${badgeStok}
+              onclick="klikProdukPOS('${nama}')">
+            <div class="card-body text-center p-2 d-flex flex-column justify-content-between">
+               <div>
+                   ${gambarHtml}
+                   <h6 class="fw-bold text-dark mb-1 text-truncate" title="${nama}" style="font-size: 0.85rem;">${nama}</h6>
+                   ${hargaHtml}
+               </div>
+               
+               <div class="mt-2">
+                   ${badgeStok}
+                   ${infoKosong} </div>
             </div>
          </div>
       </div>
@@ -1182,75 +1210,210 @@ function renderProdukGrid(data) {
    });
 }
 
-// 1. FUNGSI SAAT KARTU PRODUK DIKLIK (GANTI FUNGSI LAMA DENGAN INI)
-function klikProdukPOS(nama, harga, stok) {
-    if(stok <= 0) return myAlert('Stok Habis', 'Produk ini sedang kosong.', 'error');
-
-    // Simpan data produk ke variabel sementara
-    tempProductPOS = { nama, harga, stok };
-
-    // Siapkan Tampilan Modal
-    document.getElementById('qty-modal-title').innerText = nama;
-    const inputQty = document.getElementById('input-qty-pos');
-    inputQty.value = 1; // Default angka 1
-    document.getElementById('qty-msg-error').classList.add('d-none'); // Sembunyikan error
-
-    // Buka Modal
-    const myModal = new bootstrap.Modal(document.getElementById('modalInputQty'));
-    myModal.show();
-
-    // Auto Focus: Supaya user bisa langsung ketik angka tanpa klik inputnya dulu
-    setTimeout(() => {
-        inputQty.focus();
-        inputQty.select(); 
-    }, 500);
+// A. HELPER BARU: Ubah Qty di dalam Modal
+function ubahQtyModal(delta) {
+    const el = document.getElementById('input-qty-pos');
+    let val = Number(el.value) || 1;
+    val += delta;
+    if(val < 1) val = 1;
+    el.value = val;
 }
 
-// 2. FUNGSI TOMBOL "ENTER" DI MODAL
-function submitQtyPOS() {
-    const qtyInput = document.getElementById('input-qty-pos');
-    const qty = Number(qtyInput.value);
-    const stok = tempProductPOS.stok;
-    const nama = tempProductPOS.nama;
-    const harga = tempProductPOS.harga;
+// B. UPDATE: Fungsi Saat Produk Diklik
+function klikProdukPOS(namaProduk) {
+    const produk = globalProdukList.find(p => p[1] === namaProduk);
+    if (!produk) return;
 
-    // Validasi Input
-    if(qty <= 0) {
-        qtyInput.focus();
-        return;
-    }
+    let stok = Number(produk[4]);
+    
+    // HARGA JUAL
+    let hargaIsi = Number(produk[2]) || 0;
+    let hargaTabung = Number(produk[10]) || 0;
 
-    // Cek Mode Transaksi (Refill / Baru)
+    // [BARU] HARGA BELI (MODAL) - Diambil dari Kolom D (Index 3) & J (Index 9)
+    let hppIsi = Number(produk[3]) || 0;     
+    let hppTabung = Number(produk[9]) || 0;  
+
     let mode = document.querySelector('input[name="posMode"]:checked').value;
     
-    // Cek apakah barang sudah ada di keranjang untuk menghitung total stok yg dibutuhkan
-    let index = keranjangBelanja.findIndex(item => item.produkNama === nama && item.tipe === mode);
-    let currentQtyInCart = (index !== -1) ? keranjangBelanja[index].qty : 0;
+    // Simpan data lengkap ke temp (termasuk HPP)
+    tempProductPOS = { 
+        nama: produk[1], 
+        hargaIsi, 
+        hargaTabung, 
+        hppIsi,       // <--- Simpan HPP Isi
+        hppTabung,    // <--- Simpan HPP Tabung
+        stok, 
+        mode 
+    };
 
-    // Validasi Stok (Input Baru + Yang Sudah Ada di Keranjang > Stok Tersedia?)
-    if((currentQtyInCart + qty) > stok) {
-        document.getElementById('qty-msg-error').innerText = `Sisa stok hanya ${stok - currentQtyInCart}`;
-        document.getElementById('qty-msg-error').classList.remove('d-none');
-        return;
+    document.getElementById('qty-modal-title').innerText = produk[1];
+    
+    // Setup UI Toggle & Harga Awal
+    const boxToggle = document.getElementById('box-toggle-tabung');
+    const toggleInput = document.getElementById('toggle-isi-tabung');
+    const inputHarga = document.getElementById('input-harga-custom');
+
+    let hargaAwal = 0;
+
+    if (mode === 'Beli Tabung Baru') {
+        boxToggle.classList.remove('d-none');
+        toggleInput.checked = true; 
+        hargaAwal = hargaTabung + hargaIsi;
+        updateTampilanToggle(true); 
+    } else {
+        boxToggle.classList.add('d-none');
+        hargaAwal = hargaIsi;
+        if(stok <= 0) return myAlert('Stok Habis', 'Stok isi ulang habis.', 'error');
     }
 
-    // PROSES MASUK KERANJANG
-    if(index !== -1) {
-       // Update Qty jika sudah ada
-       keranjangBelanja[index].qty += qty;
-       keranjangBelanja[index].total = keranjangBelanja[index].qty * harga;
+    inputHarga.value = Number(hargaAwal).toLocaleString('id-ID');
+    document.getElementById('input-qty-pos').value = 1;
+    
+    // Reset Pesan Error
+    const elMsg = document.getElementById('qty-msg-error');
+    elMsg.classList.add('d-none');
+    elMsg.innerText = '';
+
+    new bootstrap.Modal(document.getElementById('modalInputQty')).show();
+    setTimeout(() => { document.getElementById('input-qty-pos').focus(); }, 500);
+}
+
+// C. UPDATE: Fungsi Hitung Harga & Animasi UI
+function hitungHargaToggle() {
+    const isFull = document.getElementById('toggle-isi-tabung').checked;
+    const inputHarga = document.getElementById('input-harga-custom');
+
+    // 1. Update UI (Warna & Teks)
+    updateTampilanToggle(isFull);
+
+    // 2. Hitung Harga
+    let hargaBaru = 0;
+    if (isFull) {
+        hargaBaru = tempProductPOS.hargaTabung + tempProductPOS.hargaIsi;
     } else {
-       // Item Baru
+        hargaBaru = tempProductPOS.hargaTabung;
+    }
+
+    // 3. Update Input Harga dengan efek flash kuning (opsional, biar kelihatan berubah)
+    inputHarga.style.backgroundColor = '#fff3cd'; // Kuning muda
+    setTimeout(() => { inputHarga.style.backgroundColor = 'transparent'; }, 300);
+    
+    inputHarga.value = Number(hargaBaru).toLocaleString('id-ID');
+}
+
+// D. HELPER BARU: Update Tampilan Visual Toggle
+function updateTampilanToggle(isActive) {
+    const box = document.getElementById('box-toggle-tabung');
+    const lblMain = document.getElementById('lbl-toggle-main');
+    const lblSub = document.getElementById('lbl-toggle-sub');
+
+    if (isActive) {
+        // === KONDISI ON: PAKET LENGKAP ===
+        box.style.border = "1px solid #198754";
+        box.style.backgroundColor = "#f0fff4"; 
+        
+        // Ganti istilah jadi "Isi + Wadah"
+        lblMain.innerText = "Isi + Wadah"; 
+        lblMain.className = "d-block fw-bold text-success";
+        lblSub.innerText = "Beli baru (Paket Lengkap)";
+    } else {
+        // === KONDISI OFF: WADAH KOSONG ===
+        box.style.border = "1px solid #dc3545";
+        box.style.backgroundColor = "#fff5f5"; 
+        
+        // Ganti istilah jadi "Wadah Kosong"
+        lblMain.innerText = "Hanya Wadah Kosong";
+        lblMain.className = "d-block fw-bold text-danger";
+        lblSub.innerText = "Jual Tabung/Galon saja";
+    }
+}
+
+// [UPDATE] 3. SUBMIT QTY (Menggunakan data tempProductPOS yang sudah dihitung)
+function submitQtyPOS() {
+    const qtyInput = document.getElementById('input-qty-pos');
+    const hargaInput = document.getElementById('input-harga-custom');
+    const elMsg = document.getElementById('qty-msg-error'); 
+    
+    const qty = Number(qtyInput.value);
+    const hargaCustom = Number(hargaInput.value.replace(/\./g, '')); 
+
+    // Reset Error
+    elMsg.classList.add('d-none');
+    elMsg.innerText = ''; // Bersihkan teks lama
+
+    if(qty <= 0) { qtyInput.focus(); return; }
+
+    const { nama, stok, mode, hppIsi, hppTabung } = tempProductPOS;
+
+    // --- 1. TENTUKAN MODAL SAAT INI ---
+    let modalSaatIni = 0;
+    let labelTipe = '';
+    
+    if (mode === 'Beli Tabung Baru') {
+        const isFull = document.getElementById('toggle-isi-tabung').checked;
+        if (isFull) {
+            // [UBAH DISINI] Gunakan istilah umum
+            labelTipe = 'Baru (Isi + Wadah)'; 
+            modalSaatIni = hppIsi + hppTabung; 
+            
+            // Cek Stok Isi
+            let index = keranjangBelanja.findIndex(item => item.produkNama === nama && item.tipe === labelTipe);
+            let currentQty = (index !== -1) ? keranjangBelanja[index].qty : 0;
+            if((currentQty + qty) > stok) {
+                elMsg.innerText = `Stok isi hanya ${stok}`;
+                elMsg.classList.remove('d-none');
+                return;
+            }
+        } else {
+            // [UBAH DISINI] Gunakan istilah umum
+            labelTipe = 'Wadah Kosong';
+            modalSaatIni = hppTabung; 
+        }
+        } else {
+            labelTipe = 'Tukar (Refill)';
+            modalSaatIni = hppIsi;
+
+        // Cek Stok Isi
+        let index = keranjangBelanja.findIndex(item => item.produkNama === nama && item.tipe === labelTipe);
+        let currentQty = (index !== -1) ? keranjangBelanja[index].qty : 0;
+        if((currentQty + qty) > stok) {
+            elMsg.innerText = `Stok isi hanya ${stok}`;
+            elMsg.classList.remove('d-none');
+            return;
+        }
+    }
+
+    // --- 2. VALIDASI HARGA (PRIVASI AMAN) ---
+    if (hargaCustom < modalSaatIni) {
+        // [UPDATE] Pesan Error Generik (Tanpa Angka Modal)
+        elMsg.innerText = "Harga terlalu rendah!";
+        elMsg.classList.remove('d-none');
+        
+        // Efek getar/merah pada input
+        hargaInput.classList.add('is-invalid');
+        setTimeout(() => hargaInput.classList.remove('is-invalid'), 2000);
+        hargaInput.focus();
+        return; // Stop proses
+    }
+
+    // --- SIMPAN KE KERANJANG ---
+    let index = keranjangBelanja.findIndex(item => item.produkNama === nama && item.tipe === labelTipe);
+
+    if(index !== -1) {
+       keranjangBelanja[index].qty += qty;
+       keranjangBelanja[index].hargaSatuan = hargaCustom;
+       keranjangBelanja[index].total = keranjangBelanja[index].qty * hargaCustom;
+    } else {
        keranjangBelanja.push({
           produkNama: nama,
           qty: qty,
-          tipe: mode,
-          hargaSatuan: harga,
-          total: qty * harga
+          tipe: labelTipe, 
+          hargaSatuan: hargaCustom, 
+          total: qty * hargaCustom
        });
     }
     
-    // Tutup Modal & Refresh Tampilan
     bootstrap.Modal.getInstance(document.getElementById('modalInputQty')).hide();
     renderKeranjangPOS();
 }
@@ -1286,7 +1449,19 @@ function renderKeranjangPOS() {
       grandTotal += item.total;
       totalItem += item.qty;
       
-      let badgeTipe = item.tipe.includes('Refill') ? '<span class="text-warning fw-bold" style="font-size:10px">● Refill</span>' : '<span class="text-success fw-bold" style="font-size:10px">● Baru</span>';
+      // --- UPDATE LOGIKA LABEL & WARNA ---
+      let labelTipe = item.tipe; // Pakai teks asli (Tabung Kosong / Tabung + Isi)
+      let warnaClass = 'text-success'; // Default Hijau (Baru)
+
+      // Cek kata kunci untuk menentukan warna
+      if(labelTipe.toLowerCase().includes('refill')) {
+          warnaClass = 'text-warning'; // Kuning (Refill)
+      } else if (labelTipe.toLowerCase().includes('kosong')) {
+          warnaClass = 'text-danger';  // Merah (Tabung Kosong)
+      }
+      
+      // Buat Badge HTML
+      let badgeTipe = `<span class="${warnaClass} fw-bold" style="font-size:10px">● ${labelTipe}</span>`;
 
       tbody.innerHTML += `
       <tr>
@@ -1372,64 +1547,90 @@ resetKeranjang = function() {
 }
 
 function simpanProduk() {
+    // 1. Ambil File Gambar
     const fileInput = document.getElementById('prod-file-gambar');
     const file = fileInput.files[0];
     
-    // Ambil data form lainnya
+    // 2. Helper untuk membersihkan format Ribuan (titik) menjadi angka biasa
+    const cleanNum = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value.replace(/\./g, '') : '0';
+    };
+
+    // 3. Susun Data Form (Termasuk Field Baru untuk Tabung)
     const dataForm = {
         sku: document.getElementById('prod-sku').value,
         kode: document.getElementById('prod-kode').value,
         nama: document.getElementById('prod-nama').value, 
         
-        // [PERBAIKAN DISINI] Hapus tanda titik sebelum kirim ke server
-        hargaJual: document.getElementById('prod-jual').value.replace(/\./g, ''), 
-        hargaBeli: document.getElementById('prod-beli').value.replace(/\./g, ''), 
+        // Harga Refill (Isi Ulang)
+        hargaJual: cleanNum('prod-jual'), 
+        hargaBeli: cleanNum('prod-beli'), 
+        
+        // [BARU] Harga Tabung Kosong
+        hargaJualTabung: cleanNum('prod-jual-tabung'),
+        hargaBeliTabung: cleanNum('prod-beli-tabung'),
         
         stokIsi: document.getElementById('prod-isi').value, 
         stokKosong: document.getElementById('prod-kosong').value,
-        gambar: '' 
+        gambar: null // Default null, nanti diisi jika ada file
     };
 
-    // Fungsi untuk mengirim data ke Google Script
-        const kirimData = (finalData) => {
-            loading(true); // Nyalakan loading
-            google.script.run.withSuccessHandler(() => { 
+    // Validasi Sederhana
+    if(!dataForm.nama) return myAlert('Error', 'Nama produk wajib diisi!', 'warning');
+
+    // 4. Fungsi Pengirim Data ke Backend (Google Script)
+    const kirimData = (finalData) => {
+        loading(true); // Nyalakan loading
+        
+        google.script.run
+            .withSuccessHandler(() => { 
                 loading(false); // Matikan loading
                 document.getElementById('loading-upload')?.classList.add('d-none');
                 
                 // Reset Preview & Input File
-                document.getElementById('img-preview').classList.add('d-none');
-                document.getElementById('img-preview').src = '';
+                const imgPrev = document.getElementById('img-preview');
+                if(imgPrev) {
+                    imgPrev.classList.add('d-none');
+                    imgPrev.src = '';
+                }
                 
                 // Tutup Modal
-                bootstrap.Modal.getInstance(document.getElementById('modalProduk')).hide(); 
+                const modalEl = document.getElementById('modalProduk');
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if(modalInstance) modalInstance.hide(); 
                 
-                // Refresh Tabel
+                // Refresh Tabel Data Produk
                 loadProduk(); 
                 
-                // Reset Form
+                // Reset Form Input
                 document.querySelectorAll('#modalProduk input').forEach(i => i.value = '');
 
-                // --- TAMBAHKAN INI AGAR MUNCUL POPUP ---
+                // Tampilkan Pesan Sukses
                 myAlert('Sukses', 'Produk berhasil disimpan ke database!', 'success');
-
-            }).tambahProduk(finalData);
-        };
+            })
+            .withFailureHandler((err) => {
+                loading(false);
+                myAlert('Gagal', err.message, 'error');
+            })
+            .tambahProduk(finalData); // Panggil fungsi di Code.gs
+    };
         
-    // LOGIKA UPLOAD GAMBAR
+    // 5. LOGIKA UPLOAD GAMBAR
     if (file) {
-        // Validasi ukuran (misal maks 2MB agar tidak berat)
+        // Validasi ukuran (Maks 2MB)
         if (file.size > 2 * 1024 * 1024) {
             return myAlert('File Terlalu Besar', 'Maksimal ukuran gambar 2MB', 'error');
         }
 
-        document.getElementById('loading-upload').classList.remove('d-none'); // Tampilkan loading teks
+        const loadingText = document.getElementById('loading-upload');
+        if(loadingText) loadingText.classList.remove('d-none'); // Tampilkan teks loading upload
         
         const reader = new FileReader();
         reader.onload = function(e) {
             // Isi properti gambar dengan data file (base64)
             dataForm.gambar = {
-                data: e.target.result.split(',')[1], // Ambil base64-nya saja
+                data: e.target.result.split(',')[1], // Ambil string base64 murni
                 mimeType: file.type,
                 fileName: 'PROD-' + Date.now() // Nama file unik
             };
@@ -1437,8 +1638,7 @@ function simpanProduk() {
         };
         reader.readAsDataURL(file);
     } else {
-        // Jika tidak ada gambar, langsung kirim data kosong
-        dataForm.gambar = null;
+        // Jika tidak ada gambar, kirim dataForm dengan gambar = null
         kirimData(dataForm);
     }
 }
@@ -4868,62 +5068,53 @@ function cetakSlipPiutang(idTrx, pelanggan, total, jatuhTempo, mode) {
             </div>`;
     }
 
-    // 3. Template HTML
-    const win = window.open('', '', 'height=700,width=900');
-    
-    // PERBAIKAN: CSS Header dibuat Center
-    const htmlContent = `
-    <html>
-    <head>
-        <title>${judulDokumen} - ${pelanggan}</title>
+    // 1. Nama File
+    const fileName = `Slip_${mode}_${pelanggan.replace(/\s+/g,'_')}_${idTrx}`;
+
+    // 2. CSS (Disesuaikan agar kompatibel dengan Google PDF Engine)
+    // Google PDF engine lebih suka CSS inline sederhana, hindari Flexbox kompleks jika layout berantakan
+    const cssStyle = `
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
-            body { font-family: 'Roboto', sans-serif; padding: 40px; color: #333; -webkit-print-color-adjust: exact; }
-            
-            /* HEADER KOP SURAT (DIPERBAIKI) */
-            .header { 
-                display: flex; 
-                align-items: center; 
-                justify-content: center; /* INI KUNCINYA: Biar di Tengah */
-                border-bottom: 3px double #333; 
-                padding-bottom: 20px; 
-                margin-bottom: 30px; 
-                text-align: center; /* Teks di dalamnya juga tengah */
-            }
-            
-            .judul-besar { font-size: 20px; font-weight: bold; color: ${warnaHeader}; text-transform: uppercase; margin-bottom: 5px; }
-            .box-info { display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 1px dashed #ccc; padding-bottom: 20px; }
+            body { font-family: sans-serif; padding: 20px; color: #333; }
+            .header { text-align: center; border-bottom: 3px double #333; padding-bottom: 20px; margin-bottom: 30px; }
+            .judul-besar { font-size: 20px; font-weight: bold; color: ${warnaHeader}; text-transform: uppercase; margin-bottom: 5px; border: 2px solid ${warnaHeader}; display:inline-block; padding: 8px 30px; border-radius: 8px; }
+            .box-info { width: 100%; margin-bottom: 30px; border-bottom: 1px dashed #ccc; padding-bottom: 20px; overflow: hidden; }
+            .left { float: left; width: 48%; }
+            .right { float: right; width: 48%; text-align: right; }
             .tabel-detail { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
             .tabel-detail th { background: #f2f2f2; text-align: left; padding: 10px; border-bottom: 2px solid #ddd; }
             .tabel-detail td { padding: 10px; border-bottom: 1px solid #eee; }
             .total-box { text-align: right; font-size: 18px; font-weight: bold; margin-top: 20px; }
-            .ttd-area { display: flex; justify-content: space-between; margin-top: 60px; text-align: center; }
-            .footer-note { margin-top: 50px; font-size: 10px; color: #777; font-style: italic; border-top: 1px solid #eee; padding-top: 10px; }
+            .ttd-area { margin-top: 50px; width: 100%; overflow: hidden; text-align: center; }
+            .ttd-left { float: left; width: 40%; }
+            .ttd-right { float: right; width: 40%; }
         </style>
-    </head>
+    `;
+
+    // 3. HTML Content (Sama seperti sebelumnya, tapi dibungkus variabel fullHtml)
+    // Tips: Gunakan 'float' daripada 'flex' untuk kompatibilitas PDF Converter Google yang lebih baik
+    const fullHtml = `
+    <html>
+    <head>${cssStyle}</head>
     <body>
         <div class="header">
             ${htmlLogo}
-            <div style="text-align: center;"> <h2 style="margin:0; font-size:24px; color:#d32f2f; text-transform: uppercase; line-height:1.2;">${namaPT}</h2>
-                <div style="font-size:11px; font-weight:bold; margin-top:5px;">${alamatPT}</div>
-                <div style="font-size:11px;">Telp: ${noPT}</div>
-            </div>
+            <h2 style="margin:0; font-size:24px; color:#d32f2f; text-transform: uppercase;">${namaPT}</h2>
+            <div style="font-size:11px;">${alamatPT} | Telp: ${noPT}</div>
         </div>
 
         <div style="text-align:center; margin-bottom:30px;">
-            <div class="judul-besar" style="border: 2px solid ${warnaHeader}; display:inline-block; padding: 8px 30px; border-radius: 8px;">
-                ${judulDokumen}
-            </div>
+            <div class="judul-besar">${judulDokumen}</div>
             <div style="margin-top:5px; color:#555; font-size:12px;">Dicetak pada: ${tglCetak}</div>
         </div>
 
         <div class="box-info">
-            <div style="width: 48%;">
-                <small style="color:#777; font-weight:bold; letter-spacing:1px;">KEPADA YTH:</small><br>
+            <div class="left">
+                <small style="color:#777; font-weight:bold;">KEPADA YTH:</small><br>
                 <span style="font-size:18px; font-weight:bold; color:#000;">${pelanggan}</span>
             </div>
-            <div style="width: 48%; text-align:right;">
-                <small style="color:#777; font-weight:bold; letter-spacing:1px;">NO. REFERENSI:</small><br>
+            <div class="right">
+                <small style="color:#777; font-weight:bold;">NO. REFERENSI:</small><br>
                 <span style="font-size:16px; font-weight:bold;">${idTrx}</span>
             </div>
         </div>
@@ -4931,12 +5122,7 @@ function cetakSlipPiutang(idTrx, pelanggan, total, jatuhTempo, mode) {
         ${pesanBody}
 
         <table class="tabel-detail">
-            <thead>
-                <tr>
-                    <th>Keterangan Transaksi</th>
-                    <th style="text-align:right;">Nominal Tagihan</th>
-                </tr>
-            </thead>
+            <thead><tr><th>Keterangan Transaksi</th><th style="text-align:right;">Nominal Tagihan</th></tr></thead>
             <tbody>
                 <tr>
                     <td>Tagihan Pembelian Barang (ID: <b>${idTrx}</b>)</td>
@@ -4950,51 +5136,68 @@ function cetakSlipPiutang(idTrx, pelanggan, total, jatuhTempo, mode) {
         </div>
 
         <div class="ttd-area">
-            <div style="width: 200px;">
-                <small>Penerima,</small>
-                <br><br><br><br>
+            <div class="ttd-left">
+                <small>Penerima,</small><br><br><br><br>
                 <div style="border-bottom: 1px solid #000; font-weight:bold;">(${pelanggan})</div>
             </div>
-            <div style="width: 200px;">
-                <small>Hormat Kami,</small>
-                <br><br><br><br>
+            <div class="ttd-right">
+                <small>Hormat Kami,</small><br><br><br><br>
                 <div style="border-bottom: 1px solid #000; font-weight:bold;">( Admin Keuangan )</div>
             </div>
         </div>
-
-        <div class="footer-note">
-            Dokumen ini dicetak secara otomatis oleh sistem SiGAS PRO. <br>
-            Harap simpan bukti ini sebagai referensi transaksi yang sah.
+        
+        <div style="margin-top: 30px; font-size: 9px; color: #777; font-style: italic; text-align: center;">
+            Dokumen ini dicetak secara otomatis oleh sistem SiGAS PRO.
         </div>
-
-        <script>
-            setTimeout(() => { window.print(); }, 800);
-        ` + '</sc' + 'ript>' + `
     </body>
     </html>
     `;
-    
-    win.document.write(htmlContent);
-    win.document.close();
+
+    // 4. Kirim ke Server
+    loading(true);
+    google.script.run
+        .withSuccessHandler(function(base64) {
+            loading(false);
+            downloadPdfFromBase64(base64, fileName);
+        })
+        .withFailureHandler(function(e) {
+            loading(false);
+            myAlert('Gagal', e.message, 'error');
+        })
+        .generatePdfFromHtml(fullHtml, fileName);
 }
 
-// [UPDATE FIX] Laporan PDF: Header Besar & Berwarna, Tabel Ramping/Padat
+// [UPDATE PERBAIKAN] Laporan PDF dengan Gambar Aman (Anti Crash)
 function printLaporanPDF(tableId, judulLaporan) {
     const table = document.getElementById(tableId);
     
-    // 1. Ambil Data Perusahaan
+    // 1. Setup Nama File
+    const tglFile = new Date().toISOString().slice(0,10);
+    const fileName = judulLaporan.replace(/\s+/g, '_') + '_' + tglFile;
+
+    // 2. Ambil Data Perusahaan
     const namaPT = globalCompanyProfile.nama_perusahaan || 'NAMA PERUSAHAAN';
-    const alamatPT = globalCompanyProfile.alamat || 'Alamat perusahaan belum diatur';
+    const alamatPT = globalCompanyProfile.alamat || '-';
     const noPT = globalCompanyProfile.no_perusahaan || '-';
-    const logoUrl = globalCompanyProfile.logo_perusahaan || ''; 
-
-    // 2. Siapkan Logo (Ukuran Normal 70px)
+    
+    // --- [LOGIKA GAMBAR DIPERBAIKI DISINI] ---
+    let logoId = null;      // <--- PENTING: Wajib dideklarasikan di sini (di luar IF)
     let htmlLogo = '';
-    if (logoUrl) {
-        htmlLogo = `<img src="${logoUrl}" style="height: 100px; width: auto; margin-right: 20px;">`;
+    
+    // Cek apakah ada logo tersimpan
+    if (globalCompanyProfile.logo_perusahaan) {
+        // Coba cari ID dari URL (format: id=...)
+        const match = globalCompanyProfile.logo_perusahaan.match(/id=([^&]+)/);
+        if (match) {
+            logoId = match[1]; // <--- Isi variabel logoId yang sudah dibuat di atas
+            
+            // Pasang Placeholder (Penanda) di HTML
+            htmlLogo = `<img src="[[LOGO_IMAGE_PLACEHOLDER]]" style="height: 80px; width: auto; margin-right: 20px;">`;
+        }
     }
+    // ------------------------------------------
 
-    // 3. Header KOP SURAT (Dibuat Besar & Jelas Kembali)
+    // 3. Header Laporan
     const headerHtml = `
         <div style="display: flex; align-items: center; justify-content: center; border-bottom: 3px double #333; padding-bottom: 15px; margin-bottom: 20px;">
             ${htmlLogo}
@@ -5004,7 +5207,6 @@ function printLaporanPDF(tableId, judulLaporan) {
                 <div style="font-size: 10pt; color: #555;">Telp: ${noPT}</div>
             </div>
         </div>
-        
         <div style="text-align: center; margin-bottom: 15px;">
             <h3 style="margin: 0; text-transform: uppercase; font-size: 14pt; font-weight:bold; text-decoration: underline;">${judulLaporan}</h3>
             <small style="color: #555; font-style: italic;">Dicetak pada: ${new Date().toLocaleString('id-ID')}</small>
@@ -5013,119 +5215,75 @@ function printLaporanPDF(tableId, judulLaporan) {
 
     // 4. Clone Tabel & Bersihkan Kolom Aksi
     let tableClone = table.cloneNode(true);
-    
-    // Hapus kolom terakhir (Aksi) di Header
     const ths = tableClone.querySelectorAll('th');
-    if(ths.length > 0) ths[ths.length - 1].remove();
-
-    // Hapus kolom terakhir (Aksi) di Body
+    if(ths.length > 0) ths[ths.length - 1].remove(); 
     const rows = tableClone.querySelectorAll('tr');
     rows.forEach(row => {
         const cells = row.querySelectorAll('td');
         if(cells.length > 0) cells[cells.length - 1].remove();
     });
 
-    // 5. Buka Jendela Print
-    const win = window.open('', '', 'height=800,width=1100');
-    
-    // 6. CSS KHUSUS (Header Besar, Tabel Ramping, Warna NYALA)
+    // 5. CSS Style
     const cssStyle = `
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
-            
-            /* Paksa Browser Cetak Warna Background */
-            body { 
-                font-family: 'Roboto', sans-serif; 
-                padding: 30px; 
-                color: #000;
-                -webkit-print-color-adjust: exact !important; 
-                print-color-adjust: exact !important;
-            }
-
-            /* --- STYLING TABEL (RAMPING) --- */
-            table { 
-                width: 100%; 
-                border-collapse: collapse; 
-                margin-top: 5px; 
-                font-size: 9pt; /* Font isi tabel kecil pas */
-            }
-            
-            /* Header Tabel: Warna Abu Terang, Padding Rapat */
-            th { 
-                background-color: #e0e0e0 !important; /* Warna Abu Wajib !important */
-                color: #000; 
-                font-weight: bold; 
-                text-transform: uppercase; 
-                padding: 6px 4px; /* Atas-Bawah 6px (Rapat), Kiri-Kanan 4px */
-                border: 1px solid #666; 
-                text-align: center;
-                font-size: 8.5pt;
-            }
-
-            /* Isi Tabel: Padding Sangat Rapat agar Baris Pendek */
-            td { 
-                padding: 4px 5px; /* INI KUNCINYA: Padding kecil bikin baris pendek */
-                border: 1px solid #999; 
-                vertical-align: middle; 
-                line-height: 1.2; /* Jarak antar baris teks didalam sel rapat */
-            }
-
-            /* Warna Baris Selang-seling */
-            tr:nth-child(even) td { background-color: #f9f9f9 !important; }
-
-            /* Kembalikan Warna Teks (Biru/Merah) */
-            .text-primary { color: #0d6efd !important; font-weight: bold; }
-            .text-danger { color: #dc3545 !important; font-weight: bold; }
-            .fw-bold { font-weight: bold; }
-            .text-muted { color: #666 !important; font-size: 0.85em; }
-            
-            /* Utility */
+            body { font-family: sans-serif; padding: 20px; color: #000; }
+            table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 9pt; }
+            th { background-color: #e0e0e0; color: #000; font-weight: bold; padding: 6px 4px; border: 1px solid #666; text-align: center; }
+            td { padding: 4px 5px; border: 1px solid #999; vertical-align: middle; line-height: 1.2; }
             .text-end { text-align: right; }
             .text-center { text-align: center; }
-
-            /* Footer Halaman */
-            @page { margin: 10mm; size: A4; }
         </style>
     `;
 
-    win.document.write('<html><head><title>Laporan - SiGAS PRO</title>');
-    win.document.write(cssStyle);
-    win.document.write('</head><body>');
-    win.document.write(headerHtml);
-    win.document.write(tableClone.outerHTML);
-    
-    // TTD Admin
-    win.document.write(`
-        <div style="margin-top: 30px; display: flex; justify-content: flex-end; page-break-inside: avoid;">
-            <div style="text-align: center; width: 180px;">
-                <small style="font-size:9pt;">Dibuat Oleh,</small>
-                <br><br><br><br>
-                <div style="border-bottom: 1px solid #000; font-weight: bold; font-size:10pt;">( Admin )</div>
-            </div>
-        </div>
-    `);
+    // 6. Gabungkan HTML
+    const fullHtml = `<html><head>${cssStyle}</head><body>${headerHtml}${tableClone.outerHTML}</body></html>`;
 
-    win.document.write('</body></html>');
-    win.document.close();
-    
-    // Jeda sedikit agar logo terload sempurna sebelum dialog print muncul
-    setTimeout(() => {
-        win.focus();
-        win.print();
-    }, 800);
+    // 7. KIRIM KE SERVER
+    loading(true);
+    google.script.run
+        .withSuccessHandler(function(base64) {
+            loading(false);
+            downloadPdfFromBase64(base64, fileName);
+        })
+        .withFailureHandler(function(err) {
+            loading(false);
+            myAlert('Gagal', 'Gagal generate PDF: ' + err.message, 'error');
+        })
+        // Pastikan variabel logoId ini terbaca (tidak merah/error)
+        .generatePdfFromHtml(fullHtml, fileName, logoId); 
 }
 
 // --- FUNGSI CETAK NOTA KEUANGAN (A5 LANDSCAPE + 3 TANDA TANGAN) ---
 function cetakNotaKeuangan(data) {
-    // 1. Ambil Profil Perusahaan
+
+    const table = document.getElementById(tableId);
+    
+    // 1. Setup Nama File
+    const tglFile = new Date().toISOString().slice(0,10);
+    const fileName = judulLaporan.replace(/\s+/g, '_') + '_' + tglFile;
+    
+    // 2. Ambil Profil Perusahaan
     const namaPT = globalCompanyProfile.nama_perusahaan || 'NAMA PERUSAHAAN';
     const alamatPT = globalCompanyProfile.alamat || '-';
     const noPT = globalCompanyProfile.no_perusahaan || '-';
     const logoUrl = globalCompanyProfile.logo_perusahaan || '';
     
+    // --- [LOGIKA BARU UNTUK GAMBAR] ---
+    let logoId = null;
     let htmlLogo = '';
-    if (logoUrl) {
-        htmlLogo = `<img src="${logoUrl}" style="height: 100px; width: auto; margin-right: 15px;">`;
+    
+    // Ekstrak ID dari URL Logo yang tersimpan
+    // URL biasanya format: https://drive.google.com/uc?export=view&id=123abc...
+    if (globalCompanyProfile.logo_perusahaan) {
+        // Coba cari pola ID=...
+        const match = globalCompanyProfile.logo_perusahaan.match(/id=([^&]+)/);
+        if (match) {
+            logoId = match[1]; // Dapat ID-nya saja (misal: 123abc...)
+            
+            // Pasang PLACEHOLDER (Penanda) di HTML
+            // Nanti server yang akan mengganti "[[LOGO_IMAGE_PLACEHOLDER]]" dengan gambar asli
+            htmlLogo = `<img src="[[LOGO_IMAGE_PLACEHOLDER]]" style="height: 80px; width: auto; margin-right: 20px;">`;
+        }
     }
 
     // 2. Tentukan Judul, Warna & Label Tanda Tangan Ketiga
@@ -5298,7 +5456,7 @@ function cetakNotaKeuangan(data) {
         </div>
 
         <script>
-            setTimeout(() => { window.print(); }, 800);
+            setTimeout(() => { window.print(); }, 2000);
         ` + '</sc' + 'ript>' + `
     </body>
     </html>
@@ -5530,7 +5688,7 @@ function cetakSlipKasbon(dataRaw) {
         </div>
 
         <script>
-            setTimeout(() => { window.print(); }, 1000);
+            setTimeout(() => { window.print(); }, 2000);
         ` + '</sc' + 'ript>' + `
     </body>
     </html>
@@ -5740,7 +5898,7 @@ function cetakRekapKasbonFull(data) {
                 Dicetak pada: ${new Date().toLocaleString('id-ID')}
             </div>
         </div>
-        <script>setTimeout(() => { window.print(); }, 1000);
+        <script>setTimeout(() => { window.print(); }, 2000);
         ` + '</sc' + 'ript>' + `
     </body>
     </html>
@@ -5876,7 +6034,7 @@ function cetakSlipGaji(data) {
                 </div>
             </div>
         </div>
-        <script>setTimeout(() => { window.print(); }, 800);
+        <script>setTimeout(() => { window.print(); }, 2000);
         ` + '</sc' + 'ript>' + `
     </body>
     </html>
@@ -5974,21 +6132,36 @@ function loadLaporanSaldo() {
 function renderLaporanUI(data) {
     const rp = (n) => new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR', minimumFractionDigits:0}).format(n);
 
-    // 1. ISI KARTU UTAMA (SUB MENU 1.1)
+    // 1. ISI KARTU UTAMA
     document.getElementById('lap-pendapatan').innerText = rp(data.pendapatan);
     document.getElementById('lap-hpp').innerText = rp(data.hpp);
     document.getElementById('lap-kotor').innerText = rp(data.labaKotor);
     document.getElementById('lap-beban').innerText = rp(data.pengeluaran);
     document.getElementById('lap-bersih').innerText = rp(data.labaBersih);
-    
-    document.getElementById('lap-stok').innerText = rp(data.nilaiStok);
     document.getElementById('lap-beli').innerText = rp(data.pembelian);
+    
+    // --- UPDATE BAGIAN ASET (LEBIH DETAIL) ---
+    const elStok = document.getElementById('lap-stok');
+    
+    // Kita ubah isinya jadi HTML agar bisa ada baris baru
+    elStok.innerHTML = `
+        <div class="fw-bold fs-4">${rp(data.nilaiStok)}</div>
+        <div class="mt-2 pt-2 border-top" style="font-size: 11px; line-height: 1.4;">
+            <div class="d-flex justify-content-between">
+                <span class="text-secondary">Wadah (Fisik):</span>
+                <span class="fw-bold text-dark">${rp(data.asetFisik)}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span class="text-secondary">Isi (Dagang):</span>
+                <span class="fw-bold text-success">${rp(data.asetDagang)}</span>
+            </div>
+        </div>
+    `;
 
-    // 2. ISI TABEL METODE BAYAR (SUB MENU 1.2)
+    // 2. ISI TABEL METODE BAYAR
     const tbMetode = document.querySelector('#tabel-metode-bayar tbody');
     tbMetode.innerHTML = '';
     
-    // Urutkan key agar rapi
     Object.keys(data.metodeBayar).forEach(m => {
         let nominal = data.metodeBayar[m];
         tbMetode.innerHTML += `
@@ -5999,8 +6172,8 @@ function renderLaporanUI(data) {
         `;
     });
 
-    // 3. ISI TABEL PENGELUARAN (SUB MENU 2)
-    document.getElementById('lap-beban-total').innerText = rp(data.pengeluaran); // Total di Tab 2
+    // 3. ISI TABEL PENGELUARAN
+    document.getElementById('lap-beban-total').innerText = rp(data.pengeluaran); 
     
     const tbBeban = document.querySelector('#tabel-det-pengeluaran tbody');
     tbBeban.innerHTML = '';
@@ -6080,41 +6253,44 @@ function exportLaporanExcel() {
 }
 
 // --- FUNGSI CETAK LAPORAN PROFESIONAL (A4) ---
+// [REVISI PRO] Export PDF Laporan Keuangan (Gaya Profesional - Clean Black & White)
 function printLaporanPDFCurrent() {
-    // 1. Cek Tab Mana yang Sedang Aktif?
+    // 1. Identifikasi Tab Aktif
     const isTabLabaAktif = document.getElementById('tab-laba').classList.contains('active');
-    
-    // Cek Tab Saldo
     const elTabSaldo = document.getElementById('tab-saldo');
     const isTabSaldoAktif = elTabSaldo && elTabSaldo.classList.contains('active');
     
-    // 2. Ambil Data Perusahaan
+    // 2. Data Perusahaan & Tanggal
     const namaPT = globalCompanyProfile.nama_perusahaan || 'NAMA PERUSAHAAN';
     const alamatPT = globalCompanyProfile.alamat || '-';
     
-    // Format Tanggal
     const tglStart = new Date(document.getElementById('lap-start').value).toLocaleDateString('id-ID');
     const tglEnd = new Date(document.getElementById('lap-end').value).toLocaleDateString('id-ID');
-    let periodeStr = `${tglStart} s/d ${tglEnd}`;
-
-    // 3. Siapkan Konten HTML Berdasarkan Tab
+    let periodeStr = `Periode: ${tglStart} s/d ${tglEnd}`;
     let judulLaporan = '';
+    let fileName = 'Laporan_Keuangan';
+
+    // --- LOGIKA LOGO (Agar Tidak Crash & Tetap Berwarna) ---
+    let logoId = null;
+    let htmlLogo = '';
+    if (globalCompanyProfile.logo_perusahaan) {
+        const match = globalCompanyProfile.logo_perusahaan.match(/id=([^&]+)/);
+        if (match) {
+            logoId = match[1];
+            // Logo diberi margin bottom agar tidak nempel header teks
+            htmlLogo = `<img src="[[LOGO_IMAGE_PLACEHOLDER]]" style="height: 65px; width: auto; margin-bottom: 8px;">`;
+        }
+    }
+    // -------------------------------------------------------
+
+    // 3. Konten HTML Body
     let kontenBody = '';
 
-    // Style Helper untuk Layout
-    const styleSummaryBox = `
-        border: 1px solid #000; 
-        padding: 15px; 
-        margin-bottom: 25px; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center;
-        background-color: #f8f9fa;
-    `;
-
     if (isTabLabaAktif) {
-        judulLaporan = 'LAPORAN LABA RUGI (PROFIT & LOSS)';
+        judulLaporan = 'LAPORAN LABA RUGI';
+        fileName = `Laba_Rugi_${tglStart}_${tglEnd}`;
         
+        // Ambil nilai tanpa class warna
         const valPendapatan = document.getElementById('lap-pendapatan').innerText;
         const valHPP = document.getElementById('lap-hpp').innerText;
         const valKotor = document.getElementById('lap-kotor').innerText;
@@ -6122,260 +6298,231 @@ function printLaporanPDFCurrent() {
         const valBersih = document.getElementById('lap-bersih').innerText;
         const valStok = document.getElementById('lap-stok').innerText;
         const valBeli = document.getElementById('lap-beli').innerText;
+        
+        // Tabel Metode Bayar (Kita ambil isinya saja, structure kita bangun ulang biar rapi)
         const tabelMetodeHTML = document.getElementById('tabel-metode-bayar').innerHTML;
 
         kontenBody = `
-            <div style="margin-bottom: 30px;">
-                <table class="table-clean" style="width:100%">
+            <table class="table-account" style="margin-top:20px;">
+                <tr>
+                    <td class="label-main">A. PENDAPATAN USAHA (OMZET)</td>
+                    <td class="value-main">${valPendapatan}</td>
+                </tr>
+                <tr>
+                    <td class="label-sub" style="padding-left: 20px;">Harga Pokok Penjualan (HPP)</td>
+                    <td class="value-sub" style="color: #000;">(${valHPP})</td> </tr>
+                <tr class="row-total">
+                    <td class="label-total">LABA KOTOR</td>
+                    <td class="value-total">${valKotor}</td>
+                </tr>
+                <tr>
+                    <td class="label-sub" style="padding-left: 20px; padding-top:15px;">Biaya Operasional & Pengeluaran</td>
+                    <td class="value-sub" style="padding-top:15px;">(${valBeban})</td>
+                </tr>
+                <tr class="row-grand-total">
+                    <td class="label-grand">LABA BERSIH (NET PROFIT)</td>
+                    <td class="value-grand">${valBersih}</td>
+                </tr>
+            </table>
+
+            <div style="margin-top: 40px;">
+                <table style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td class="label">A. Pendapatan (Omzet)</td>
-                        <td class="value text-success">${valPendapatan}</td>
-                    </tr>
-                    <tr>
-                        <td class="label">B. Harga Pokok Penjualan (HPP)</td>
-                        <td class="value text-warning">(${valHPP})</td>
-                    </tr>
-                    <tr class="highlight-row">
-                        <td class="label fw-bold">C. LABA KOTOR (A - B)</td>
-                        <td class="value fw-bold">${valKotor}</td>
-                    </tr>
-                    <tr>
-                        <td class="label">D. Pengeluaran Operasional</td>
-                        <td class="value text-danger">(${valBeban})</td>
-                    </tr>
-                    <tr class="highlight-row bg-dark text-white">
-                        <td class="label fw-bold" style="font-size:14pt">G. LABA BERSIH (NET PROFIT)</td>
-                        <td class="value fw-bold" style="font-size:14pt">${valBersih}</td>
+                        <td style="width:48%; vertical-align:top;">
+                            <div class="section-title">Data Stok Barang</div>
+                            <table class="table-borderless">
+                                <tr><td style="padding:4px 0;">Nilai Aset Stok</td><td style="text-align:right; font-weight:bold;">${valStok}</td></tr>
+                                <tr><td style="padding:4px 0;">Pembelian Stok (Periode Ini)</td><td style="text-align:right; font-weight:bold;">${valBeli}</td></tr>
+                            </table>
+                        </td>
+                        <td style="width:4%;"></td>
+                        <td style="width:48%; vertical-align:top;">
+                            <div class="section-title">Rincian Pembayaran Diterima</div>
+                            <table class="table-bordered">
+                                <thead><tr style="background-color:#f2f2f2;"><th>Metode</th><th style="text-align:right;">Total</th></tr></thead>
+                                <tbody>${tabelMetodeHTML}</tbody>
+                            </table>
+                        </td>
                     </tr>
                 </table>
-            </div>
-
-            <div class="row-cols">
-                <div class="col-half">
-                    <h4 class="sub-title">Data Tambahan</h4>
-                    <table class="table-bordered">
-                        <tr><td>Nilai Aset Stok</td><td class="text-end fw-bold">${valStok}</td></tr>
-                        <tr><td>Pembelian Stok (Periode Ini)</td><td class="text-end fw-bold">${valBeli}</td></tr>
-                    </table>
-                </div>
-                <div class="col-half">
-                    <h4 class="sub-title">Rincian Metode Pembayaran</h4>
-                    <table class="table-bordered">
-                        <thead><tr style="background:#eee"><th>Metode</th><th class="text-end">Jumlah</th></tr></thead>
-                        ${tabelMetodeHTML}
-                    </table>
-                </div>
             </div>
         `;
 
     } else if (isTabSaldoAktif) {
-        // --- [UPDATE] LAPORAN SALDO YANG LEBIH RAPI & PROFESIONAL ---
-        judulLaporan = 'LAPORAN POSISI KEUANGAN (NERACA SALDO)';
-        const tanggalCetak = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        periodeStr = `Posisi Per Tanggal: ${tanggalCetak}`; 
+        judulLaporan = 'NERACA SALDO (POSISI KEUANGAN)';
+        const tglNow = new Date().toISOString().slice(0,10);
+        fileName = `Neraca_Saldo_${tglNow}`;
+        periodeStr = `Posisi Per Tanggal: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`; 
 
         const valTotalSaldo = document.getElementById('total-saldo-all').innerText;
         
-        // Kita ambil data dari DOM tabel asli, tapi kita susun ulang HTML-nya agar bersih dari Icon/Tombol
+        // Re-construct Rows agar bersih dari HTML aneh-aneh
         const rows = document.querySelectorAll('#tabel-lap-saldo tbody tr');
         let cleanRows = '';
-
-        rows.forEach((row, index) => {
-             // Ambil cell
+        rows.forEach((row, idx) => {
              const tds = row.querySelectorAll('td');
              if(tds.length > 0) {
-                 // Kolom 1: Nama Akun (biasanya ada div, kita ambil teks-nya saja)
-                 // Struktur: <td>...<div class="fw-bold">NAMA</div><small>ID</small>...</td>
+                 // Bersihkan nama akun
                  let nama = tds[0].querySelector('.fw-bold') ? tds[0].querySelector('.fw-bold').innerText : tds[0].innerText;
                  let idAkun = tds[0].querySelector('small') ? tds[0].querySelector('small').innerText : '';
-                 
-                 // Kolom 2: No Rek
                  let norek = tds[1].innerText;
-                 
-                 // Kolom 3: Tipe
                  let tipe = tds[2].innerText;
-                 
-                 // Kolom 4: Saldo
                  let saldo = tds[3].innerText;
+                 
+                 // Zebra striping manual untuk PDF (Genap/Ganjil)
+                 let bg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
 
                  cleanRows += `
-                    <tr>
-                        <td style="padding: 8px;">
-                            <strong>${nama}</strong><br>
-                            <span style="font-size:8pt; color:#666;">${idAkun}</span>
+                    <tr style="background-color:${bg};">
+                        <td style="padding: 6px;">
+                            <span style="font-weight:bold;">${nama}</span><br>
+                            <span style="font-size:8pt; color:#444;">${idAkun}</span>
                         </td>
-                        <td style="text-align:center; padding: 8px;">${norek}</td>
-                        <td style="text-align:center; padding: 8px;">${tipe}</td>
-                        <td style="text-align:right; font-weight:bold; padding: 8px;">${saldo}</td>
-                    </tr>
-                 `;
+                        <td style="text-align:center;">${norek}</td>
+                        <td style="text-align:center;">${tipe}</td>
+                        <td style="text-align:right; font-weight:bold;">${saldo}</td>
+                    </tr>`;
              }
         });
 
         kontenBody = `
-            <div style="${styleSummaryBox}">
-                <div>
-                    <div style="font-size:10pt; text-transform:uppercase; letter-spacing:1px; color:#555;">Total Aset Keuangan</div>
-                    <div style="font-size:8pt; color:#777;">(Kas Tunai + Bank + E-Wallet)</div>
-                </div>
-                <div style="font-size:20pt; font-weight:800; color:#000;">
-                    ${valTotalSaldo}
-                </div>
+            <div style="border: 1px solid #000; padding: 15px; margin-bottom: 30px; text-align:center;">
+                <div style="font-size:10pt; text-transform:uppercase; letter-spacing:1px; margin-bottom:5px;">Total Aset Keuangan</div>
+                <div style="font-size:22pt; font-weight:bold; color:#000;">${valTotalSaldo}</div>
             </div>
             
-            <h4 class="sub-title">Rincian Saldo Akun</h4>
-            <table class="table-bordered full-width">
+            <div class="section-title">Rincian Saldo Akun</div>
+            <table class="table-bordered">
                 <thead>
-                    <tr>
+                    <tr style="background-color:#eee;">
                         <th style="width:40%;">Nama Akun</th>
                         <th style="width:25%;">No. Rekening</th>
                         <th style="width:15%;">Tipe Akun</th>
                         <th style="width:20%; text-align:right;">Saldo Akhir</th>
                     </tr>
                 </thead>
-                <tbody>
-                    ${cleanRows}
-                </tbody>
+                <tbody>${cleanRows}</tbody>
             </table>
-
-            <div style="margin-top: 30px; font-size: 9pt; color: #555; border-top: 1px solid #ddd; padding-top: 10px;">
-                <strong>Catatan:</strong><br>
-                Laporan ini merupakan snapshot saldo real-time pada saat dicetak. Pastikan seluruh transaksi penerimaan dan pengeluaran hari ini telah dicatat sebelum mencetak laporan ini untuk memastikan akurasi data.
-            </div>
         `;
 
     } else {
-        judulLaporan = 'LAPORAN PENGELUARAN OPERASIONAL';
+        judulLaporan = 'LAPORAN PENGELUARAN';
+        fileName = `Pengeluaran_${tglStart}_${tglEnd}`;
         
         const valTotalBeban = document.getElementById('lap-beban-total').innerText;
         
-        // Clone tabel pengeluaran & bersihkan class bootstrap
+        // Clone Tabel
         let tabelAsli = document.getElementById('tabel-det-pengeluaran').cloneNode(true);
-        tabelAsli.className = 'table-bordered full-width'; 
+        tabelAsli.className = 'table-bordered'; 
+        tabelAsli.removeAttribute('style'); // Hapus style bawaan jika ada
         
+        // Hapus kolom aksi
+        const ths = tabelAsli.querySelectorAll('th');
+        if(ths.length > 0) ths[ths.length - 1].remove();
+        const trs = tabelAsli.querySelectorAll('tr');
+        trs.forEach(r => {
+             const cells = r.querySelectorAll('td');
+             if(cells.length > 0) cells[cells.length - 1].remove();
+             // Paksa text hitam di dalam tabel
+             r.style.color = '#000';
+        });
+
         kontenBody = `
-            <div style="${styleSummaryBox}">
-                <div style="font-size:10pt; text-transform:uppercase; letter-spacing:1px; color:#555;">Total Pengeluaran</div>
-                <div style="font-size:18pt; font-weight:800; color:#dc3545;">
-                    ${valTotalBeban}
-                </div>
+            <div style="border-bottom: 2px solid #000; padding: 10px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:11pt; font-weight:bold;">TOTAL PENGELUARAN</span>
+                <span style="font-size:16pt; font-weight:bold;">${valTotalBeban}</span>
             </div>
-            
-            <h4 class="sub-title">Rincian Transaksi</h4>
+            <div class="section-title">Rincian Transaksi</div>
             ${tabelAsli.outerHTML}
         `;
     }
 
-    // 4. Buka Jendela Print
-    const win = window.open('', '', 'height=800,width=1000');
-    
-    // 5. Template HTML (A4 Professional Style)
-    const htmlContent = `
-    <!DOCTYPE html>
-    <html lang="id">
-    <head>
-        <title>${judulLaporan}</title>
+    // 4. CSS STYLE - PROFESSIONAL & CLEAN (No Colors for Data)
+    const cssStyle = `
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
-            
-            @page { 
-                size: A4; 
-                margin: 15mm 20mm; 
-            }
-            
+            @page { margin: 15mm; size: A4; }
             body { 
-                font-family: 'Roboto', sans-serif; 
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
                 color: #000; 
-                -webkit-print-color-adjust: exact; 
-                print-color-adjust: exact;
-            }
-
-            /* Header Perusahaan */
-            .header { text-align: center; border-bottom: 3px double #000; padding-bottom: 15px; margin-bottom: 25px; }
-            .pt-name { font-size: 18pt; font-weight: 800; text-transform: uppercase; margin: 0; color: #000; letter-spacing: 1px; }
-            .pt-addr { font-size: 9pt; margin-top: 5px; color: #444; }
-
-            /* Judul Laporan */
-            .report-title { text-align: center; text-transform: uppercase; font-size: 14pt; font-weight: 700; margin-bottom: 5px; text-decoration: underline; }
-            .report-period { text-align: center; font-size: 10pt; color: #555; margin-bottom: 30px; font-style: italic; }
-
-            /* Tabel Style */
-            .table-clean td { padding: 6px 0; border-bottom: 1px dotted #ccc; font-size: 10pt; }
-            .table-clean .label { width: 60%; }
-            .table-clean .value { text-align: right; font-weight: 500; }
-            
-            .table-bordered { width: 100%; border-collapse: collapse; font-size: 9pt; }
-            .table-bordered th { 
-                border: 1px solid #000; 
-                padding: 8px; 
-                background-color: #e9ecef !important; 
-                text-transform: uppercase;
-                font-size: 8pt;
-            }
-            .table-bordered td { 
-                border: 1px solid #999; 
-                padding: 6px 8px; 
-            }
-            
-            /* Alternating Rows (Zebra) */
-            .table-bordered tr:nth-child(even) { background-color: #f8f9fa !important; }
-
-            .full-width { width: 100%; }
-            
-            .highlight-row { background-color: #f8f9fa; font-weight: bold; border-top: 2px solid #000; border-bottom: 2px solid #000; }
-            .bg-dark { background-color: #000 !important; color: #fff !important; }
-
-            .row-cols { display: flex; gap: 30px; }
-            .col-half { flex: 1; }
-            .sub-title { 
-                border-bottom: 1px solid #000; 
-                padding-bottom: 5px; 
-                margin-bottom: 10px; 
                 font-size: 10pt; 
-                text-transform: uppercase; 
-                font-weight: bold;
-                margin-top: 20px;
+                line-height: 1.4;
             }
-
-            /* Utility Colors */
-            .text-success { color: #198754; font-weight:bold; }
-            .text-danger { color: #dc3545; font-weight:bold; }
-            .text-warning { color: #d63384; font-weight:bold; } 
-            .text-end { text-align: right; }
-            .fw-bold { font-weight: bold; }
             
-            /* Footer */
-            .footer { 
-                position: fixed; bottom: 0; left: 0; right: 0;
-                text-align: right; font-size: 8pt; color: #777; 
-                border-top: 1px solid #eee; padding-top: 5px;
-            }
+            /* Header Style */
+            .header-container { text-align: center; margin-bottom: 30px; border-bottom: 3px double #000; padding-bottom: 15px; }
+            .company-name { font-size: 18pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
+            .company-address { font-size: 9pt; margin-top: 5px; color: #333; }
+            
+            /* Title Style */
+            .report-title { text-align: center; font-size: 14pt; font-weight: bold; text-transform: uppercase; text-decoration: underline; margin-bottom: 5px; }
+            .report-period { text-align: center; font-size: 9pt; color: #333; margin-bottom: 35px; font-style: italic; }
+            
+            /* Table Utility */
+            .table-account { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            .table-account td { padding: 6px 0; vertical-align: bottom; }
+            
+            /* Laba Rugi Specifics */
+            .label-main { font-weight: bold; font-size: 11pt; }
+            .value-main { text-align: right; font-weight: bold; font-size: 11pt; }
+            
+            .row-total { border-top: 1px solid #000; }
+            .label-total { font-weight: bold; padding-top: 5px; text-transform: uppercase; }
+            .value-total { text-align: right; font-weight: bold; padding-top: 5px; }
+            
+            /* Grand Total (Double Line) */
+            .row-grand-total { border-top: 1px solid #000; border-bottom: 4px double #000; height: 40px; }
+            .label-grand { font-weight: 800; font-size: 12pt; vertical-align: middle !important; text-transform: uppercase; }
+            .value-grand { text-align: right; font-weight: 800; font-size: 14pt; vertical-align: middle !important; }
+
+            /* Standard Table (Saldo & Pengeluaran) */
+            .table-bordered { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 5px; }
+            .table-bordered th { border: 1px solid #000; padding: 8px; font-weight: bold; text-align: center; text-transform: uppercase; background-color: #f0f0f0; }
+            .table-bordered td { border: 1px solid #888; padding: 6px 8px; }
+            .table-borderless { width: 100%; }
+            
+            .section-title { font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; display: inline-block; margin-bottom: 5px; font-size: 9pt; }
+            
+            /* Helper */
+            .text-end { text-align: right; }
         </style>
-    </head>
+    `;
+
+    // 5. Rakit HTML Lengkap
+    const fullHtml = `
+    <html>
+    <head>${cssStyle}</head>
     <body>
-        <div class="header">
-            <h1 class="pt-name">${namaPT}</h1>
-            <div class="pt-addr">${alamatPT}</div>
+        <div class="header-container">
+            ${htmlLogo}
+            <div class="company-name">${namaPT}</div>
+            <div class="company-address">${alamatPT}</div>
         </div>
 
         <div class="report-title">${judulLaporan}</div>
         <div class="report-period">${periodeStr}</div>
 
         ${kontenBody}
-
-        <div class="footer">
-            Dicetak otomatis oleh Sistem SiGAS PRO pada ${new Date().toLocaleString('id-ID')}
+        
+        <div style="margin-top: 50px; text-align: center; font-size: 8pt; color: #555;">
+            Dokumen ini dicetak otomatis oleh sistem SiGAS PRO.<br>
+            Tanggal Cetak: ${new Date().toLocaleString('id-ID')}
         </div>
-
-        <script>
-            setTimeout(() => { window.print(); }, 800);
-        ` + '</sc' + 'ript>' + `
     </body>
     </html>
     `;
 
-    win.document.write(htmlContent);
-    win.document.close();
+    // 6. Eksekusi Download
+    loading(true);
+    google.script.run
+        .withSuccessHandler(function(base64) {
+            loading(false);
+            downloadPdfFromBase64(base64, fileName.replace(/\s+/g, '_'));
+        })
+        .withFailureHandler(function(err) {
+            loading(false);
+            myAlert('Gagal', err.message, 'error');
+        })
+        .generatePdfFromHtml(fullHtml, fileName, logoId);
 }
 
 // --- FITUR NOTIFIKASI LONCENG ---
@@ -6443,6 +6590,55 @@ function getNotifikasiData() {
   return notifikasiList;
 }
 
+function tampilkanLogAktivitas() {
+    loading(true);
+    google.script.run.withSuccessHandler(function(dataLog) {
+        loading(false);
+        
+        let html = `
+            <div style="padding:20px;">
+                <h3>Log Aktivitas Sistem (50 Terakhir)</h3>
+                <table class="table table-sm table-striped" style="font-size:9pt;">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Aksi</th>
+                            <th>Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        dataLog.forEach(r => {
+            // Beri warna badge berdasarkan jenis aksi
+            let badgeClass = 'bg-secondary';
+            if(r.aksi.includes('HAPUS')) badgeClass = 'bg-danger';
+            if(r.aksi.includes('TRANSAKSI')) badgeClass = 'bg-success';
+            if(r.aksi.includes('EDIT')) badgeClass = 'bg-warning text-dark';
+            
+            html += `
+                <tr>
+                    <td>${r.waktu}</td>
+                    <td><span class="badge ${badgeClass}">${r.aksi}</span></td>
+                    <td>${r.detail}</td>
+                </tr>
+            `;
+        });
+        
+        html += `</tbody></table></div>`;
+        
+        // Tampilkan di Modal atau Swal
+        Swal.fire({
+            title: '',
+            html: html,
+            width: '800px',
+            showConfirmButton: true,
+            confirmButtonText: 'Tutup'
+        });
+        
+    }).getLogAktivitas();
+}
+
 // --- FUNGSI FORMAT RUPIAH SAAT MENGETIK ---
 function formatRupiahInput(input) {
   // 1. Hapus semua karakter selain angka
@@ -6454,5 +6650,18 @@ function formatRupiahInput(input) {
   } else {
       input.value = '';
   }
+}
+
+// --- HELPER DOWNLOAD PDF ---
+function downloadPdfFromBase64(base64, filename) {
+  // Buat link virtual
+  const link = document.createElement('a');
+  link.href = 'data:application/pdf;base64,' + base64;
+  link.download = filename + ".pdf"; // Nama file otomatis
+  
+  // Klik otomatis link tersebut
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 </script>
