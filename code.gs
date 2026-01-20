@@ -14,23 +14,21 @@ function setupDatabase() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheets = [
     {name: 'USERS', header: ['Username', 'Password', 'Role', 'Nama']},
-    {name: 'PRODUK', header: ['ID', 'Nama_Produk', 'Harga_Jual', 'Harga_Beli', 'Stok_Isi', 'Stok_Kosong', 'SKU', 'Kode', 'Link_Gambar']},
+    // [UPDATE] Menambah kolom Harga_Beli_Tabung & Harga_Jual_Tabung (Index 9 & 10)
+    {name: 'PRODUK', header: ['ID', 'Nama_Produk', 'Harga_Jual', 'Harga_Beli', 'Stok_Isi', 'Stok_Kosong', 'SKU', 'Kode', 'Link_Gambar', 'Harga_Beli_Tabung', 'Harga_Jual_Tabung']},
     {name: 'PELANGGAN', header: ['ID', 'Nama', 'Nama_Perusahan', 'NoHP', 'Alamat']},
     {name: 'SUPPLIER', header: ['ID', 'Nama_Supplier', 'NoHP', 'Alamat']},
     {name: 'TRANSAKSI', header: ['ID_Trans', 'Waktu', 'Pelanggan', 'Produk', 'Qty', 'Total', 'Tipe', 'Kasir', 'Metode_Bayar', 'Jatuh_Tempo', 'Status']},
     {name: 'PEMBELIAN', header: ['ID_Beli', 'Waktu', 'Supplier', 'Produk', 'Qty', 'Total', 'Metode']},
-    // [UPDATE] Header Keuangan ditambah kolom 'Akun'
     {name: 'KEUANGAN', header: ['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Keterangan', 'Akun']}, 
     {name: 'KATEGORI', header: ['Nama_Kategori']},
-    {name: 'KARYAWAN', header: ['ID', 'Nama_Lengkap', 'Tempat_Lahir', 'Tanggal_Lahir', 'Jenis_Kelamin', 
-    'No_Identitas', 'Tipe_Identitas', 'Email', 'Alamat_KTP', 'Alamat_Domisili',
-    'Nama_Darurat', 'Telp_Darurat', 'Gaji_Pokok', 'Bonus', 'Foto_Url', 'Status', 'Tanggal_Masuk'
-    ]}, 
-    {name: 'RIWAYAT_GAJI', header: ['ID_Gaji', 'Periode', 'Tanggal_Generate', 'Nama_Karyawan', 'Gaji_Pokok', 'Bonus', 'Potongan_Kasbon', 'Total_THP', 'Status']}, 
+    {name: 'KARYAWAN', header: ['ID', 'Nama_Lengkap', 'Tempat_Lahir', 'Tanggal_Lahir', 'Jenis_Kelamin', 'No_Identitas', 'Tipe_Identitas', 'Email', 'Alamat_KTP', 'Alamat_Domisili', 'Nama_Darurat', 'Telp_Darurat', 'Gaji_Pokok', 'Bonus', 'Foto_Url', 'Status', 'Tanggal_Masuk']}, 
+    {name: 'RIWAYAT_GAJI', header: ['ID_Gaji', 'Periode', 'Tanggal_Generate', 'Nama_Karyawan', 'Gaji_Pokok', 'Bonus', 'Potongan_Kasbon', 'Total_THP', 'Status', 'Kasbon_Baru']}, 
     {name: 'KASBON', header: ['ID_Kasbon', 'Tanggal', 'Nama_Karyawan', 'Nominal', 'Keterangan', 'Status_Lunas', 'Sudah_Bayar', 'Tenor', 'Angsuran_Per_Bulan']},
     {name: 'RIWAYAT_BAYAR_KASBON', header: ['ID_Bayar', 'ID_Kasbon', 'Tanggal_Bayar', 'Nominal_Bayar', 'Tipe_Bayar', 'Keterangan']},
     {name: 'PENGATURAN', header: ['Key', 'Value']},
-    {name: 'AKUN_KAS', header: ['ID_Akun', 'Nama_Akun', 'No_Rekening', 'Tipe', 'Saldo_Awal']} 
+    {name: 'AKUN_KAS', header: ['ID_Akun', 'Nama_Akun', 'No_Rekening', 'Tipe', 'Saldo_Awal']},
+    {name: 'LOG_AKTIVITAS', header: ['']} 
   ];
 
   sheets.forEach(s => {
@@ -223,7 +221,7 @@ function simpanProfilPerusahaan(form) {
        // Set Permission agar bisa dilihat publik
        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
        
-       const logoUrl = "https://drive.google.com/thumbnail?id=" + file.getId() + "&sz=w1000";
+        const logoUrl = "https://drive.google.com/thumbnail?id=" + file.getId() + "&sz=w1000";
        
        // Simpan URL Logo ke Database
        updateOrInsert('logo_perusahaan', logoUrl);
@@ -239,6 +237,8 @@ function simpanProfilPerusahaan(form) {
   updateOrInsert('alamat', form.alamat);
   updateOrInsert('no_perusahaan', form.no_perusahaan);
   updateOrInsert('no_pemilik', form.no_pemilik);
+
+  catatLog("SETTING", "Mengubah profil perusahaan");
 
   return "Profil & Logo Berhasil Disimpan!";
 }
@@ -461,7 +461,7 @@ function tambahProduk(form) {
 
       // 4. Ambil Link
       // Ganti format link jadi Thumbnail (agar tidak crash/broken di browser)
-      imageUrl = "https://drive.google.com/thumbnail?id=" + file.getId() + "&sz=w1000";
+      imageUrl = "https://drive.google.com/uc?export=view&id=" + file.getId();
 
     } catch (e) {
       // Tampilkan error detail jika gagal
@@ -472,18 +472,22 @@ function tambahProduk(form) {
     imageUrl = (typeof form.gambar === 'string') ? form.gambar : '';
   }
 
-  // Simpan ke Spreadsheet
+  // [UPDATE] Simpan data Tabung
   sheet.appendRow([
     'P-' + Date.now(), 
     form.nama, 
-    form.hargaJual, 
-    form.hargaBeli, 
+    form.hargaJual,       // Harga Jual Refill
+    form.hargaBeli,       // Harga Beli Refill (HPP Isi)
     form.stokIsi, 
     form.stokKosong,
     form.sku,     
     form.kode,    
-    imageUrl 
+    imageUrl,
+    form.hargaBeliTabung || 0, // [Baru] HPP Tabung Kosong (cth: 189.000)
+    form.hargaJualTabung || 0  // [Baru] Harga Jual Tabung Kosong (cth: 198.000)
   ]);
+
+  catatLog("PRODUK_BARU", "Menambah produk: " + formObject.nama_barang + " | Stok Awal: " + formObject.stok);
 }
 
 // [BARU] Fungsi Update Produk (Edit Mode)
@@ -519,7 +523,7 @@ function updateProduk(form) {
       const folder = DriveApp.getFolderById(FOLDER_ID);
       const file = folder.createFile(blob);
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      finalImageUrl = "https://drive.google.com/thumbnail?id=" + file.getId() + "&sz=w1000";
+      finalimageUrl = "https://drive.google.com/uc?export=view&id=" + file.getId();
     } catch (e) {
       // Jika gagal upload, tetap lanjut simpan data teks, gambar pakai yang lama
       console.log("Gagal update gambar: " + e.message);
@@ -529,16 +533,19 @@ function updateProduk(form) {
       finalImageUrl = form.gambar;
   }
 
-  // 3. Update Baris (KECUALI STOK ISI & KOSONG)
-  // Urutan Kolom: [0]ID, [1]Nama, [2]Jual, [3]Beli, [4]Isi(SKIP), [5]Kosong(SKIP), [6]SKU, [7]Kode, [8]Gambar
+  // [UPDATE] Update Kolom Baru
+  sheet.getRange(rowTarget, 2).setValue(form.nama);
+  sheet.getRange(rowTarget, 3).setValue(form.hargaJual);
+  sheet.getRange(rowTarget, 4).setValue(form.hargaBeli);
+  sheet.getRange(rowTarget, 7).setValue(form.sku);
+  sheet.getRange(rowTarget, 8).setValue(form.kode);
+  sheet.getRange(rowTarget, 9).setValue(finalImageUrl);
   
-  sheet.getRange(rowTarget, 2).setValue(form.nama);       // Update Nama
-  sheet.getRange(rowTarget, 3).setValue(form.hargaJual);  // Update Harga Jual
-  sheet.getRange(rowTarget, 4).setValue(form.hargaBeli);  // Update Harga Beli
-  // Kolom 5 & 6 (Stok) TIDAK DISENTUH
-  sheet.getRange(rowTarget, 7).setValue(form.sku);        // Update SKU
-  sheet.getRange(rowTarget, 8).setValue(form.kode);       // Update Kode Barcode
-  sheet.getRange(rowTarget, 9).setValue(finalImageUrl);   // Update Gambar
+  // Kolom 10 & 11 (Index sheet mulai dari 1, jadi J=10, K=11)
+  sheet.getRange(rowTarget, 10).setValue(form.hargaBeliTabung || 0); 
+  sheet.getRange(rowTarget, 11).setValue(form.hargaJualTabung || 0);
+
+  catatLog("EDIT_PRODUK", "Mengupdate data produk: " + formObject.nama_barang);
 
   return "Produk Berhasil Diupdate!";
 }
@@ -550,10 +557,6 @@ function hapusProduk(nama) {
     if (data[i][1] == nama) { sheet.deleteRow(i + 1); break; }
   }
 }
-
-// --- MODIFIKASI: TRANSAKSI & KASIR ---
-
-// GANTI function simpanTransaksiBulk(dataTransaksi) dengan ini:
 
 function simpanTransaksiBulk(dataTransaksi) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -568,61 +571,100 @@ function simpanTransaksiBulk(dataTransaksi) {
   let totalBelanja = 0;
   let summaryProduk = [];
   
-  // Status Transaksi
-  let statusTrx = (dataTransaksi.metode === 'Hutang') ? 'Belum Lunas' : 'Lunas';
+  // Array untuk menampung update yang akan dilakukan (agar tidak update satu-satu di awal)
+  let updatesToExecute = [];
 
-  // 1. LOOP BARANG (Stok)
-  dataTransaksi.items.forEach(item => {
-    let itemFound = false;
-    for (let i = 1; i < prodData.length; i++) {
-      if (prodData[i][1] == item.produkNama) {
-        let curIsi = Number(prodData[i][4]);
-        let curKosong = Number(prodData[i][5]);
-        
-        if (curIsi < item.qty) throw new Error(`Stok ${item.produkNama} Habis! Sisa: ${curIsi}`);
+  // --- TAHAP 1: VALIDASI STOK (Loop Cek Dulu) ---
+  // Kita cek semua item. Jika ada satu aja yang stoknya kurang, STOP & ERROR.
+  
+  for (let x = 0; x < dataTransaksi.items.length; x++) {
+      let item = dataTransaksi.items[x];
+      let itemFound = false;
 
-        let newIsi = curIsi - item.qty;
-        let newKosong = curKosong;
-        if (item.tipe === 'Tukar (Refill)') {
-           newKosong = curKosong + Number(item.qty); 
-        }
-        
-        prodSheet.getRange(i + 1, 5).setValue(newIsi);
-        prodSheet.getRange(i + 1, 6).setValue(newKosong);
-        itemFound = true;
-        break;
+      for (let i = 1; i < prodData.length; i++) {
+          if (prodData[i][1] == item.produkNama) {
+              
+              let curIsi = Number(prodData[i][4]);    // Stok Isi
+              let curKosong = Number(prodData[i][5]); // Stok Wadah/Kosong
+              let qty = Number(item.qty);
+              let tipe = String(item.tipe).toLowerCase();
+
+              // Siapkan variable hasil hitungan
+              let newIsi = curIsi;
+              let newKosong = curKosong;
+
+              // --- LOGIKA STOK (WADAH / REFILL) ---
+              if (tipe.includes('kosong')) {
+                  // KASUS A: Beli Wadah Kosong -> Cek Stok Kosong
+                  if (curKosong < qty) throw new Error(`Stok Wadah ${item.produkNama} Kurang! Sisa: ${curKosong}`);
+                  newKosong = curKosong - qty;
+              
+              } else if (tipe.includes('baru') || (tipe.includes('isi') && tipe.includes('wadah'))) {
+                  // KASUS B: Beli Baru (Isi + Wadah) -> Cek Stok Isi
+                  if (curIsi < qty) throw new Error(`Stok Isi ${item.produkNama} Kurang! Sisa: ${curIsi}`);
+                  newIsi = curIsi - qty;
+                  // Stok Wadah TETAP (Tidak berubah karena fisik wadah keluar selamanya sebagai barang dagangan)
+
+              } else {
+                  // KASUS C: Refill / Tukar -> Cek Stok Isi
+                  if (curIsi < qty) throw new Error(`Stok Isi ${item.produkNama} Kurang! Sisa: ${curIsi}`);
+                  newIsi = curIsi - qty;
+                  newKosong = curKosong + qty; // Terima cangkang dari user
+              }
+
+              // Simpan rencana update ke array (Row Index, New Isi, New Kosong)
+              updatesToExecute.push({
+                  rowIndex: i + 1,
+                  valIsi: newIsi,
+                  valKosong: newKosong,
+                  nama: item.produkNama
+              });
+              
+              // Update data di memory sementara (prodData) agar item berikutnya (jika produk sama) membaca stok terbaru
+              prodData[i][4] = newIsi;
+              prodData[i][5] = newKosong;
+
+              itemFound = true;
+              break;
+          }
       }
-    }
-    
-    if(!itemFound) throw new Error(`Produk ${item.produkNama} tidak ditemukan.`);
+      
+      if(!itemFound) throw new Error(`Produk ${item.produkNama} tidak ditemukan di Database.`);
+  }
 
-    // Catat Transaksi
-    trxSheet.appendRow([
-      idTrxMaster, waktu, dataTransaksi.pelanggan, item.produkNama, item.qty, 
-      item.total, item.tipe, dataTransaksi.kasir, dataTransaksi.metode, 
-      dataTransaksi.jatuhTempo, statusTrx 
-    ]);
+  // --- TAHAP 2: EKSEKUSI (Simpan ke Database) ---
+  // Jika kode sampai sini, berarti SEMUA stok aman. Baru kita tulis ke Sheet.
 
-    totalBelanja += Number(item.total);
-    summaryProduk.push(`${item.produkNama} (${item.qty})`);
+  updatesToExecute.forEach(upd => {
+      prodSheet.getRange(upd.rowIndex, 5).setValue(upd.valIsi);    // Update Stok Isi
+      prodSheet.getRange(upd.rowIndex, 6).setValue(upd.valKosong); // Update Stok Wadah
   });
 
-  // LOGIKA KEUANGAN
+  // --- TAHAP 3: CATAT TRANSAKSI ---
+  let statusTrx = (dataTransaksi.metode === 'Hutang') ? 'Belum Lunas' : 'Lunas';
+  
+  dataTransaksi.items.forEach(item => {
+      trxSheet.appendRow([
+        idTrxMaster, waktu, dataTransaksi.pelanggan, item.produkNama, item.qty, 
+        item.total, item.tipe, dataTransaksi.kasir, dataTransaksi.metode, 
+        dataTransaksi.jatuhTempo, statusTrx 
+      ]);
+      totalBelanja += Number(item.total);
+      summaryProduk.push(`${item.produkNama} (${item.qty})`);
+  });
+
+  // Catat Keuangan
   if (dataTransaksi.metode !== 'Hutang') {
       keuSheet.appendRow([
-        'FIN-' + idTrxMaster, 
-        waktu, 
-        'Pemasukan', 
-        'Penjualan Gas', 
-        totalBelanja, 
-        `Penjualan: ${summaryProduk.join(', ')}`,
-        dataTransaksi.metode 
+        'FIN-' + idTrxMaster, waktu, 'Pemasukan', 'Penjualan Gas', 
+        totalBelanja, `Penjualan: ${summaryProduk.join(', ')}`, dataTransaksi.metode 
       ]);
   }
+
+  // SISIPKAN INI DI BAWAHNYA:
+  catatLog("TRANSAKSI_BARU", "ID: " + data.idTrx + " | Pelanggan: " + data.namaPelanggan + " | Total: " + data.total);
   
-  // [TAMBAHAN WAJIB] Paksa simpan detik ini juga
   SpreadsheetApp.flush(); 
-  
   return "Transaksi Berhasil Disimpan!";
 }
 
@@ -957,6 +999,9 @@ function prosesRetur(idTrx, produkNama, qty, tipe, mode) {
       nominalRefund, `Retur: ${produkNama} (${idTrx})`
   ]);
 
+  // SISIPKAN INI:
+  catatLog("HAPUS_TRANSAKSI", "Menghapus Transaksi ID: " + idTrx);
+
   return "Berhasil Retur/Hapus";
 }
 
@@ -1174,7 +1219,7 @@ function simpanKaryawan(form) {
       const folder = DriveApp.getFolderById(FOLDER_ID);
       const file = folder.createFile(blob);
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      fotoUrl = "https://drive.google.com/thumbnail?id=" + file.getId() + "&sz=w1000";
+      fotoUrl = "https://drive.google.com/uc?export=view&id=" + file.getId();
     } catch (e) {
       // Jika gagal upload, biarkan kosong/lama
       console.log("Upload Error: " + e.message);
@@ -1724,107 +1769,259 @@ function hitungHariKerja(tglMulai, tglSelesai) {
 
 // --- MODUL LAPORAN TERPUSAT ---
 
+// [Code.gs]
+
+function setupDatabase() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheets = [
+    {name: 'USERS', header: ['Username', 'Password', 'Role', 'Nama']},
+    // [UPDATE] Menambah kolom Harga_Beli_Tabung & Harga_Jual_Tabung (Index 9 & 10)
+    {name: 'PRODUK', header: ['ID', 'Nama_Produk', 'Harga_Jual', 'Harga_Beli', 'Stok_Isi', 'Stok_Kosong', 'SKU', 'Kode', 'Link_Gambar', 'Harga_Beli_Tabung', 'Harga_Jual_Tabung']},
+    {name: 'PELANGGAN', header: ['ID', 'Nama', 'Nama_Perusahan', 'NoHP', 'Alamat']},
+    {name: 'SUPPLIER', header: ['ID', 'Nama_Supplier', 'NoHP', 'Alamat']},
+    {name: 'TRANSAKSI', header: ['ID_Trans', 'Waktu', 'Pelanggan', 'Produk', 'Qty', 'Total', 'Tipe', 'Kasir', 'Metode_Bayar', 'Jatuh_Tempo', 'Status']},
+    {name: 'PEMBELIAN', header: ['ID_Beli', 'Waktu', 'Supplier', 'Produk', 'Qty', 'Total', 'Metode']},
+    {name: 'KEUANGAN', header: ['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Keterangan', 'Akun']}, 
+    {name: 'KATEGORI', header: ['Nama_Kategori']},
+    {name: 'KARYAWAN', header: ['ID', 'Nama_Lengkap', 'Tempat_Lahir', 'Tanggal_Lahir', 'Jenis_Kelamin', 'No_Identitas', 'Tipe_Identitas', 'Email', 'Alamat_KTP', 'Alamat_Domisili', 'Nama_Darurat', 'Telp_Darurat', 'Gaji_Pokok', 'Bonus', 'Foto_Url', 'Status', 'Tanggal_Masuk']}, 
+    {name: 'RIWAYAT_GAJI', header: ['ID_Gaji', 'Periode', 'Tanggal_Generate', 'Nama_Karyawan', 'Gaji_Pokok', 'Bonus', 'Potongan_Kasbon', 'Total_THP', 'Status', 'Kasbon_Baru']}, 
+    {name: 'KASBON', header: ['ID_Kasbon', 'Tanggal', 'Nama_Karyawan', 'Nominal', 'Keterangan', 'Status_Lunas', 'Sudah_Bayar', 'Tenor', 'Angsuran_Per_Bulan']},
+    {name: 'RIWAYAT_BAYAR_KASBON', header: ['ID_Bayar', 'ID_Kasbon', 'Tanggal_Bayar', 'Nominal_Bayar', 'Tipe_Bayar', 'Keterangan']},
+    {name: 'PENGATURAN', header: ['Key', 'Value']},
+    {name: 'AKUN_KAS', header: ['ID_Akun', 'Nama_Akun', 'No_Rekening', 'Tipe', 'Saldo_Awal']} 
+  ];
+  // ... (Sisa kode setupDatabase sama) ...
+  sheets.forEach(s => {
+    let sheet = ss.getSheetByName(s.name);
+    if (!sheet) {
+      sheet = ss.insertSheet(s.name);
+      sheet.appendRow(s.header);
+      // ... default data ...
+    }
+  });
+}
+
+function tambahProduk(form) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('PRODUK');
+  
+  // ID Folder Google Drive Anda
+  const FOLDER_ID = '15hiLtvusofF2OJpXVq8lJkePbmqVIuPM'; 
+  
+  let imageUrl = '';
+
+  // PROSES UPLOAD
+  if (form.gambar && form.gambar.data) {
+    try {
+      const decoded = Utilities.base64Decode(form.gambar.data);
+      const blob = Utilities.newBlob(decoded, form.gambar.mimeType, form.gambar.fileName);
+      
+      // 1. Ambil Folder Tujuan
+      const folder = DriveApp.getFolderById(FOLDER_ID);
+      
+      // 2. Simpan File di Folder Tersebut
+      const file = folder.createFile(blob); 
+      
+      // 3. Set Permission (Coba Publik -> Domain -> Private)
+      try {
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (e1) {
+        try {
+           file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+        } catch (e2) {
+           console.log("Gagal set permission: " + e1.message); 
+        }
+      }
+
+      // 4. Ambil Link
+      // Ganti format link jadi Thumbnail (agar tidak crash/broken di browser)
+      imageUrl = "https://drive.google.com/thumbnail?id=" + file.getId() + "&sz=w1000";
+
+    } catch (e) {
+      // Tampilkan error detail jika gagal
+      throw new Error("Gagal Upload: " + e.message); 
+    }
+  } else {
+    // Jika manual link
+    imageUrl = (typeof form.gambar === 'string') ? form.gambar : '';
+  }
+
+  // Simpan ke Spreadsheet
+  sheet.appendRow([
+    'P-' + Date.now(), 
+    form.nama, 
+    form.hargaJual,       // Harga Jual Refill
+    form.hargaBeli,       // Harga Beli Refill (HPP Isi)
+    form.stokIsi, 
+    form.stokKosong,
+    form.sku,     
+    form.kode,    
+    imageUrl,
+    form.hargaBeliTabung || 0, // [Baru] HPP Tabung Kosong (cth: 189.000)
+    form.hargaJualTabung || 0  // [Baru] Harga Jual Tabung Kosong (cth: 198.000)
+  ]);
+}
+
+function updateProduk(form) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('PRODUK');
+  const data = sheet.getDataRange().getValues();
+  const FOLDER_ID = '15hiLtvusofF2OJpXVq8lJkePbmqVIuPM';
+
+  let rowTarget = -1;
+  let oldImage = '';
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == form.id) {
+      rowTarget = i + 1;
+      oldImage = data[i][8];
+      break;
+    }
+  }
+
+  if (rowTarget === -1) throw new Error("Produk tidak ditemukan.");
+
+  // ... (Logika gambar sama) ...
+  let finalImageUrl = oldImage; // Default
+
+  // [UPDATE] Update Kolom Baru
+  sheet.getRange(rowTarget, 2).setValue(form.nama);
+  sheet.getRange(rowTarget, 3).setValue(form.hargaJual);
+  sheet.getRange(rowTarget, 4).setValue(form.hargaBeli);
+  sheet.getRange(rowTarget, 7).setValue(form.sku);
+  sheet.getRange(rowTarget, 8).setValue(form.kode);
+  sheet.getRange(rowTarget, 9).setValue(finalImageUrl);
+  
+  // Kolom 10 & 11 (Index sheet mulai dari 1, jadi J=10, K=11)
+  sheet.getRange(rowTarget, 10).setValue(form.hargaBeliTabung || 0); 
+  sheet.getRange(rowTarget, 11).setValue(form.hargaJualTabung || 0);
+
+  return "Produk Berhasil Diupdate!";
+}
+
 function getLaporanDetail(startStr, endStr) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  // 1. Parsing Tanggal Filter (Set Jam ke 00:00 dan 23:59)
   const startDate = new Date(startStr); startDate.setHours(0,0,0,0);
   const endDate = new Date(endStr); endDate.setHours(23,59,59,999);
 
-  // 2. Ambil Semua Data Mentah
   const prodData = getData('PRODUK');
   const trxData = getData('TRANSAKSI');
   const keuData = getData('KEUANGAN');
   
-  // 3. Inisialisasi Variabel Laporan
   let laporan = {
     pendapatan: 0,
-    hpp: 0,           // Harga Pokok Penjualan
-    pengeluaran: 0,   // Beban Operasional
-    pembelian: 0,     // Belanja Stok
-    nilaiStok: 0,     // Aset Stok Saat Ini
+    hpp: 0,
+    pengeluaran: 0,
+    pembelian: 0,
+    nilaiStok: 0,      // Total Aset Stok
+    asetFisik: 0,      // [BARU] Nilai Cangkang
+    asetDagang: 0,     // [BARU] Nilai Isi
     labaKotor: 0,
     labaBersih: 0,
-    metodeBayar: {},  // Ringkasan Metode Bayar
-    listPengeluaran: [] // Detail Tabel Pengeluaran
+    metodeBayar: {},
+    listPengeluaran: []
   };
 
-  // A. HITUNG NILAI STOK SAAT INI (Snapshot)
-  // Rumus: Stok Isi * Harga Beli
+  // 1. MAPPING DATA PRODUK & HITUNG ASET STOK (LOGIKA BARU)
+  let mapProduk = {};
+  
   prodData.forEach(p => {
-    let hargaBeli = Number(p[3]) || 0;
-    let stok = Number(p[4]) || 0;
-    laporan.nilaiStok += (stok * hargaBeli);
+    // p[3]: Harga Beli Isi (Refill)
+    // p[4]: Stok Isi
+    // p[5]: Stok Wadah Kosong
+    // p[9]: Harga Beli Tabung (Cangkang)
+
+    let hppIsi = Number(p[3]) || 0;
+    let hppTabung = Number(p[9]) || 0;
+    let stokIsi = Number(p[4]) || 0;
+    let stokKosong = Number(p[5]) || 0;
+
+    mapProduk[p[1]] = {
+        hppIsi: hppIsi,
+        hppTabung: hppTabung,
+        stokIsi: stokIsi
+    };
+    
+    // --- RUMUS ASET TOTAL ---
+    
+    // A. Nilai Fisik (Semua tabung, baik isi maupun kosong)
+    //    Rumus: (Jumlah Isi + Jumlah Kosong) * Harga Tabung
+    let nilaiCangkang = (stokIsi + stokKosong) * hppTabung;
+    
+    // B. Nilai Dagangan (Hanya yang ada isinya)
+    //    Rumus: Jumlah Isi * Harga Refill
+    let nilaiIsi = stokIsi * hppIsi;
+
+    // Total Aset Produk ini
+    laporan.asetFisik += nilaiCangkang;
+    laporan.asetDagang += nilaiIsi;
+    laporan.nilaiStok += (nilaiCangkang + nilaiIsi);
   });
 
-  // B. HITUNG TRANSAKSI (Pendapatan, HPP, Metode Bayar)
-  // Map Harga Beli Produk untuk lookup HPP
-  let mapHargaBeli = {}; 
-  prodData.forEach(p => mapHargaBeli[p[1]] = Number(p[3]) || 0);
-
+  // 2. HITUNG TRANSAKSI
   trxData.forEach(row => {
     let tgl = new Date(row[1]);
+    
     if (tgl >= startDate && tgl <= endDate) {
-        
         let produk = row[3];
         let qty = Number(row[4]);
         let totalJual = Number(row[5]);
-        let metode = row[8]; // Kolom I
+        let tipe = String(row[6]).toLowerCase(); 
         let status = row[10];
 
-        // Hanya hitung jika tidak dibatalkan (Opsional: sesuaikan logika status)
-        // Disini kita anggap semua transaksi yg tercatat adalah valid penjualan
-        
-        // 1. Pendapatan
-        laporan.pendapatan += totalJual;
+        if(!String(status).includes('Retur')) {
+            laporan.pendapatan += totalJual;
 
-        // 2. HPP (Estimasi: Qty * Harga Beli Terakhir di Master)
-        let modalSatuan = mapHargaBeli[produk] || 0;
-        laporan.hpp += (qty * modalSatuan);
+            // Hitung HPP (Modal Terjual)
+            let infoProd = mapProduk[produk];
+            if(infoProd) {
+                let modalSatuan = 0;
 
-        // 3. Ringkasan Metode Bayar
-        if(!laporan.metodeBayar[metode]) laporan.metodeBayar[metode] = 0;
-        laporan.metodeBayar[metode] += totalJual;
-    }
-  });
+                if (tipe.includes('kosong')) {
+                    // Jual Wadah Kosong -> Modal = HPP Tabung
+                    modalSatuan = infoProd.hppTabung;
+                
+                } else if (tipe.includes('baru') || (tipe.includes('isi') && tipe.includes('wadah'))) {
+                    // Jual Paket -> Modal = HPP Isi + HPP Tabung
+                    modalSatuan = infoProd.hppIsi + infoProd.hppTabung;
+                
+                } else {
+                    // Refill -> Modal = HPP Isi
+                    modalSatuan = infoProd.hppIsi;
+                }
 
-  // C. HITUNG KEUANGAN (Pengeluaran & Pembelian Stok)
-  keuData.forEach(row => {
-    let tgl = new Date(row[1]);
-    if (tgl >= startDate && tgl <= endDate) {
-        let jenis = row[2]; // Pemasukan / Pengeluaran
-        let kategori = row[3];
-        let nominal = Number(row[4]);
-        
-        if (jenis === 'Pengeluaran') {
-           // Pisahkan antara "Beli Stok" dan "Beban Operasional"
-           if (kategori === 'Pembelian Stok') {
-              laporan.pembelian += nominal;
-           } else if (kategori !== 'Retur Penjualan') { 
-              // Retur biasanya mengurangi pendapatan, tapi disini kita masukkan ke Pengeluaran Operasional atau abaikan jika sudah handle di struk.
-              // Kita anggap semua pengeluaran selain beli stok adalah Beban.
-              laporan.pengeluaran += nominal;
-              
-              // Masukkan ke List Detail Pengeluaran
-              laporan.listPengeluaran.push({
-                 id: row[0],
-                 tanggal: row[1],
-                 kategori: kategori,
-                 ket: row[5],
-                 jumlah: nominal
-              });
-           }
+                laporan.hpp += (qty * modalSatuan);
+            }
+
+            // Metode Bayar
+            let metode = row[8];
+            if(!laporan.metodeBayar[metode]) laporan.metodeBayar[metode] = 0;
+            laporan.metodeBayar[metode] += totalJual;
         }
     }
   });
 
-  // D. FINALISASI (Laba Rugi)
+  // 3. HITUNG PENGELUARAN
+  keuData.forEach(row => {
+      let tgl = new Date(row[1]);
+      if (tgl >= startDate && tgl <= endDate) {
+          if (row[2] === 'Pengeluaran') {
+             if (row[3] === 'Pembelian Stok') {
+                 laporan.pembelian += Number(row[4]);
+             } else if (row[3] !== 'Retur Penjualan') {
+                 laporan.pengeluaran += Number(row[4]);
+                 laporan.listPengeluaran.push({
+                    id: row[0], tanggal: row[1], kategori: row[3], ket: row[5], jumlah: Number(row[4])
+                 });
+             }
+          }
+      }
+  });
+
   laporan.labaKotor = laporan.pendapatan - laporan.hpp;
   laporan.labaBersih = laporan.labaKotor - laporan.pengeluaran;
-
-  // E. TAMBAHAN: AMBIL SALDO AKUN REALTIME
-  // Kita gunakan fungsi getDaftarAkun() yang sudah ada agar hitungannya sinkron
-  laporan.daftarAkun = getDaftarAkun(); 
+  laporan.daftarAkun = getDaftarAkun();
 
   return laporan;
 }
@@ -1910,4 +2107,111 @@ function getNotifikasiData() {
   }
   
   return notifikasiList;
+}
+
+// --- FITUR EXPORT PDF (SERVER SIDE) ---
+
+// --- FITUR EXPORT PDF (SERVER SIDE) DENGAN GAMBAR ---
+
+function generatePdfFromHtml(htmlContent, filename, logoId) { // <--- Tambah parameter logoId
+  
+  // 1. INJECT LOGO BASE64 (Jika ada ID Logo)
+  if (logoId) {
+    try {
+      // Ambil file dari Drive
+      var file = DriveApp.getFileById(logoId);
+      var blob = file.getBlob();
+      // Konversi ke Base64
+      var b64Data = Utilities.base64Encode(blob.getBytes());
+      var type = blob.getContentType();
+      var imgSource = "data:" + type + ";base64," + b64Data;
+      
+      // Ganti Placeholder di HTML dengan Gambar Asli
+      htmlContent = htmlContent.replace('[[LOGO_IMAGE_PLACEHOLDER]]', imgSource);
+      
+    } catch (e) {
+      // Jika gagal (file terhapus/salah ID), kosongkan saja
+      htmlContent = htmlContent.replace('[[LOGO_IMAGE_PLACEHOLDER]]', ''); 
+    }
+  }
+
+  // 2. Buat Blob HTML
+  var htmlBlob = Utilities.newBlob(htmlContent, 'text/html', filename + '.html');
+  
+  // 3. Simpan Temporary
+  var tempFile = DriveApp.createFile(htmlBlob);
+  
+  // 4. Konversi ke PDF
+  var pdfBlob = tempFile.getAs('application/pdf');
+  pdfBlob.setName(filename + ".pdf");
+  
+  // 5. Encode Hasil PDF
+  var base64 = Utilities.base64Encode(pdfBlob.getBytes());
+  
+  // 6. Hapus File Sampah
+  tempFile.setTrashed(true);
+
+  catatLog("EXPORT_PDF", "Mendownload file: " + filename);
+  
+  return base64;
+}
+
+// --- FITUR LOG AKTIVITAS (AUDIT TRAIL) ---
+
+function catatLog(aksi, detail) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetLog = ss.getSheetByName('LOG_AKTIVITAS');
+    
+    // 1. Jika Sheet Log belum ada, buat baru otomatis
+    if (!sheetLog) {
+      sheetLog = ss.insertSheet('LOG_AKTIVITAS');
+      // Buat Header
+      sheetLog.appendRow(['TIMESTAMP', 'USER / EMAIL', 'JENIS AKSI', 'DETAIL AKTIVITAS']);
+      sheetLog.setFrozenRows(1);
+      sheetLog.getRange("A1:D1").setFontWeight("bold").setBackground("#ddd");
+      sheetLog.setColumnWidth(1, 150); // Lebar kolom Waktu
+      sheetLog.setColumnWidth(4, 400); // Lebar kolom Detail
+    }
+    
+    // 2. Ambil Waktu & User Saat Ini
+    var waktu = new Date(); // Waktu server
+    
+    // Mencoba mengambil email user (Tergantung setting Deploy: Execute as Me / User)
+    // Jika 'Execute as Me', ini akan selalu email Anda.
+    // Jika aplikasi punya sistem login sendiri, Anda bisa oper nama user dari parameter.
+    var user = Session.getActiveUser().getEmail(); 
+    if (!user) user = 'Guest/Admin'; 
+
+    // 3. Simpan ke Baris Baru
+    sheetLog.appendRow([waktu, user, aksi, detail]);
+    
+  } catch (e) {
+    // Jika gagal mencatat log, jangan sampai mengganggu fungsi utama
+    Logger.log("Gagal mencatat log: " + e.message);
+  }
+}
+
+// Fungsi untuk mengambil data Log agar bisa dilihat di Web (Opsional)
+function getLogAktivitas() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('LOG_AKTIVITAS');
+  if (!sheet) return [];
+  
+  // Ambil 50 aktivitas terakhir saja (agar tidak berat)
+  var lastRow = sheet.getLastRow();
+  var startRow = Math.max(2, lastRow - 50); 
+  if (lastRow < 2) return []; // Data kosong
+  
+  var data = sheet.getRange(startRow, 1, lastRow - startRow + 1, 4).getValues();
+  
+  // Balik urutan agar yang terbaru di atas
+  return data.reverse().map(function(row) {
+    return {
+      waktu: Utilities.formatDate(new Date(row[0]), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss"),
+      user: row[1],
+      aksi: row[2],
+      detail: row[3]
+    };
+  });
 }
